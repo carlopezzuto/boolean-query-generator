@@ -67,8 +67,15 @@ async function getLinkedInCookies() {
   const manualCookies = await getManualCookies();
   if (manualCookies && manualCookies.li_at && manualCookies.JSESSIONID) {
     console.log("[Background] Using manual cookies");
+    // CSRF token should NOT have quotes
     const csrfToken = manualCookies.JSESSIONID.replace(/"/g, '');
-    const cookieString = `li_at=${manualCookies.li_at}; JSESSIONID=${manualCookies.JSESSIONID}`;
+    // JSESSIONID cookie value needs quotes if not already present
+    const jsessionValue = manualCookies.JSESSIONID.startsWith('"')
+      ? manualCookies.JSESSIONID
+      : `"${manualCookies.JSESSIONID}"`;
+    const cookieString = `li_at=${manualCookies.li_at}; JSESSIONID=${jsessionValue}`;
+    console.log("[Background] Cookie string:", cookieString.substring(0, 50) + "...");
+    console.log("[Background] CSRF token:", csrfToken);
     return {
       cookies: cookieString,
       csrfToken: csrfToken,
@@ -118,17 +125,24 @@ async function getLinkedInCookies() {
       cookieMap[cookie.name] = cookie.value;
     }
 
-    // Extract CSRF token from JSESSIONID
+    // Extract CSRF token from JSESSIONID (without quotes)
     let csrfToken = null;
     if (cookieMap.JSESSIONID) {
       csrfToken = cookieMap.JSESSIONID.replace(/"/g, '');
     }
 
-    // Build cookie string
-    const cookieString = cookies.map(c => `${c.name}=${c.value}`).join('; ');
+    // Build cookie string - ensure JSESSIONID has quotes
+    const cookieString = cookies.map(c => {
+      if (c.name === 'JSESSIONID') {
+        const value = c.value.startsWith('"') ? c.value : `"${c.value}"`;
+        return `${c.name}=${value}`;
+      }
+      return `${c.name}=${c.value}`;
+    }).join('; ');
 
     const isAuthenticated = !!cookieMap.li_at;
     console.log("[Background] Auto cookies - authenticated:", isAuthenticated, "has CSRF:", !!csrfToken);
+    console.log("[Background] Cookie string:", cookieString.substring(0, 80) + "...");
 
     return {
       cookies: cookieString,
@@ -211,7 +225,13 @@ async function getHeaders() {
     "accept-language": "en-US,en;q=0.9",
     "x-restli-protocol-version": "2.0.0",
     "x-li-lang": "en_US",
-    "x-li-track": '{"clientVersion":"1.13.0"}',
+    "x-li-track": '{"clientVersion":"1.13.17","mpVersion":"1.13.17","osName":"web","timezoneOffset":-5,"timezone":"America/New_York","deviceFormFactor":"DESKTOP","mpName":"voyager-web","displayDensity":1,"displayWidth":1920,"displayHeight":1080}',
+    "x-li-page-instance": "urn:li:page:d_flagship3_search_srp_all;",
+    "origin": "https://www.linkedin.com",
+    "referer": "https://www.linkedin.com/",
+    "sec-fetch-dest": "empty",
+    "sec-fetch-mode": "cors",
+    "sec-fetch-site": "same-origin",
   };
 
   if (csrfToken) {
@@ -417,22 +437,28 @@ async function typeaheadSearch(query, type, extraParams = "") {
       const response = await fetch(url, {
         method: "GET",
         headers: headers,
-        credentials: "include"
+        credentials: "omit"  // Don't auto-attach cookies, we set them manually in headers
       });
 
       console.log(`[Background] ${type} Response:`, response.status);
 
       if (response.ok) {
         const data = await response.json();
+        console.log(`[Background] ${type} data keys:`, Object.keys(data));
         const results = parseTypeaheadResults(data, type);
 
         if (results.length > 0) {
           setCache(type, query, results);
           return results;
         }
+        console.log(`[Background] ${type} parsed 0 results from data`);
+      } else {
+        // Log error response for debugging
+        const errorText = await response.text().catch(() => 'Could not read response');
+        console.error(`[Background] ${type} Error ${response.status}:`, errorText.substring(0, 200));
       }
     } catch (error) {
-      console.log(`[Background] Endpoint failed:`, error.message);
+      console.error(`[Background] Endpoint failed:`, error.message, error.stack);
     }
   }
 
@@ -502,7 +528,7 @@ async function testConnection() {
           const response = await fetch(url, {
             method: "GET",
             headers: headers,
-            credentials: "include"
+            credentials: "omit"  // Don't auto-attach cookies, we set them manually in headers
           });
 
           if (response.ok) {
