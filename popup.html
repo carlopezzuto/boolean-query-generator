@@ -1,0 +1,175 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Boolean Query Generator</title>
+  <link rel="stylesheet" href="popup.css">
+</head>
+<body>
+  <div class="container">
+    <!-- Header -->
+    <header class="header">
+      <h1>🔍 Boolean Query Generator</h1>
+      <div class="tabs">
+        <button class="tab active" data-tab="generator">Generator</button>
+        <button class="tab" data-tab="presets">Presets</button>
+        <button class="tab" data-tab="history">History</button>
+      </div>
+    </header>
+
+    <!-- Generator Tab -->
+    <div class="tab-content active" id="generator-tab">
+      <!-- Platform Selector -->
+      <div class="platform-selector">
+        <label class="platform-option">
+          <input type="radio" name="platform" value="google" checked>
+          <span class="platform-label">
+            <span class="platform-icon">🌐</span>
+            <span class="platform-name">Google (X-ray)</span>
+            <span class="platform-desc">LinkedIn profiles, web sourcing</span>
+          </span>
+        </label>
+        <label class="platform-option">
+          <input type="radio" name="platform" value="github">
+          <span class="platform-label">
+            <span class="platform-icon">🐙</span>
+            <span class="platform-name">GitHub User Search</span>
+            <span class="platform-desc">Developer profiles</span>
+          </span>
+        </label>
+      </div>
+
+      <!-- Input Form -->
+      <form id="query-form">
+        <!-- Common Fields -->
+        <div class="form-group">
+          <label for="skills">
+            Skills / Languages
+            <span class="hint">Comma or newline separated</span>
+          </label>
+          <textarea id="skills" rows="2" placeholder="Python, Go, Rust"></textarea>
+        </div>
+
+        <!-- Google-only Fields -->
+        <div class="google-only">
+          <div class="form-group">
+            <label for="titles">
+              Titles
+              <span class="hint">Job titles to match</span>
+            </label>
+            <textarea id="titles" rows="2" placeholder="Engineer, Developer, Architect"></textarea>
+          </div>
+
+          <div class="form-group">
+            <label for="companies">
+              Companies
+              <span class="hint">Target companies</span>
+            </label>
+            <textarea id="companies" rows="2" placeholder="Google, Meta, Apple"></textarea>
+          </div>
+
+          <div class="form-group">
+            <label for="exclusions">
+              Exclusions
+              <span class="hint">Terms to exclude</span>
+            </label>
+            <input type="text" id="exclusions" placeholder="recruiter, intern, manager">
+          </div>
+        </div>
+
+        <!-- GitHub-only Fields -->
+        <div class="github-only" style="display: none;">
+          <div class="form-group">
+            <label for="minFollowers">
+              Min Followers
+              <span class="hint">Filter by follower count</span>
+            </label>
+            <input type="number" id="minFollowers" placeholder="10" min="0">
+          </div>
+
+          <div class="form-group">
+            <label for="keywords">
+              Keywords
+              <span class="hint">Search in bio/name</span>
+            </label>
+            <input type="text" id="keywords" placeholder="backend, distributed systems">
+          </div>
+        </div>
+
+        <!-- Common: Locations -->
+        <div class="form-group">
+          <label for="locations">
+            Locations
+            <span class="hint">Geographic filters</span>
+          </label>
+          <textarea id="locations" rows="2" placeholder="San Francisco, New York, Berlin"></textarea>
+        </div>
+
+        <!-- Action Buttons -->
+        <div class="form-actions">
+          <button type="submit" class="btn btn-primary">Generate Queries</button>
+          <button type="button" class="btn btn-secondary" id="save-preset-btn">Save as Preset</button>
+          <button type="button" class="btn btn-ghost" id="clear-form-btn">Clear</button>
+        </div>
+      </form>
+
+      <!-- Results -->
+      <div id="results" class="results" style="display: none;">
+        <div class="results-header">
+          <h2>Generated Queries</h2>
+          <div class="results-actions">
+            <span class="results-count"></span>
+            <button class="btn btn-small" id="copy-all-btn">📋 Copy All</button>
+            <button class="btn btn-small" id="open-all-btn">🚀 Open All</button>
+          </div>
+        </div>
+        <div class="query-list" id="query-list"></div>
+      </div>
+    </div>
+
+    <!-- Presets Tab -->
+    <div class="tab-content" id="presets-tab">
+      <div class="presets-list" id="presets-list">
+        <p class="empty-state">No saved presets yet. Create one from the Generator tab.</p>
+      </div>
+    </div>
+
+    <!-- History Tab -->
+    <div class="tab-content" id="history-tab">
+      <div class="history-header">
+        <button class="btn btn-small btn-danger" id="clear-history-btn">Clear History</button>
+      </div>
+      <div class="history-list" id="history-list">
+        <p class="empty-state">No query history yet.</p>
+      </div>
+    </div>
+  </div>
+
+  <!-- Save Preset Modal -->
+  <div class="modal" id="preset-modal" style="display: none;">
+    <div class="modal-content">
+      <h3>Save Preset</h3>
+      <div class="form-group">
+        <label for="preset-name">Preset Name</label>
+        <input type="text" id="preset-name" placeholder="Backend Engineer SF">
+      </div>
+      <div class="modal-actions">
+        <button class="btn btn-secondary" id="cancel-preset-btn">Cancel</button>
+        <button class="btn btn-primary" id="confirm-preset-btn">Save</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Toast Notification -->
+  <div class="toast" id="toast"></div>
+
+  <script src="query-generator.js"></script>
+  <script src="storage.js"></script>
+  <script src="popup.js"></script>
+
+<div class="powered-by">
+      &nbsp;Made with ❤️ by <a href="https://linkedin.com/in/carlopezzuto" target="_blank">Carlo Pezzuto</a>
+    </div>
+</body>
+</html>

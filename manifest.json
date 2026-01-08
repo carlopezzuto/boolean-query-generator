@@ -1,0 +1,24 @@
+{
+  "manifest_version": 3,
+  "name": "Boolean Query Generator",
+  "version": "1.0.0",
+  "description": "Generate optimized boolean search queries for Google X-ray and GitHub user search with full coverage splitting.",
+  "permissions": [
+    "storage",
+    "clipboardWrite",
+    "tabs"
+  ],
+  "action": {
+    "default_popup": "popup.html",
+    "default_icon": {
+      "16": "icons/icon16.png",
+      "48": "icons/icon48.png",
+      "128": "icons/icon128.png"
+    }
+  },
+  "icons": {
+    "16": "icons/icon16.png",
+    "48": "icons/icon48.png",
+    "128": "icons/icon128.png"
+  }
+}
