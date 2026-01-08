@@ -533,6 +533,15 @@ textarea {
   border-top: 1px solid var(--gray-200);
 }
 
+.hack-toggle-top {
+  margin-top: 0;
+  margin-bottom: 12px;
+  padding-top: 0;
+  padding-bottom: 12px;
+  border-top: none;
+  border-bottom: 1px solid var(--gray-200);
+}
+
 .toggle-label {
   display: flex !important;
   align-items: center;

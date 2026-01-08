@@ -53,12 +53,12 @@ function initPlatformSelector() {
 function updateFieldVisibility(platform) {
   const googleFields = document.querySelector(".google-only");
   const githubFields = document.querySelector(".github-only");
-  const linkedinFields = document.querySelector(".linkedin-only");
+  const linkedinFields = document.querySelectorAll(".linkedin-only");
 
   // Hide all platform-specific fields first
   googleFields.style.display = "none";
   githubFields.style.display = "none";
-  linkedinFields.style.display = "none";
+  linkedinFields.forEach(el => el.style.display = "none");
 
   // Show fields for selected platform
   if (platform === "google") {
@@ -66,7 +66,7 @@ function updateFieldVisibility(platform) {
   } else if (platform === "github") {
     githubFields.style.display = "block";
   } else if (platform === "linkedin") {
-    linkedinFields.style.display = "block";
+    linkedinFields.forEach(el => el.style.display = "block");
   }
 }
 
