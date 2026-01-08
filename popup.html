@@ -124,30 +124,95 @@
           <div class="form-group">
             <label for="linkedin-titles">
               Titles
-              <span class="hint">Job titles to match</span>
+              <span class="hint">Job titles to match (in keywords)</span>
             </label>
             <textarea id="linkedin-titles" rows="2" placeholder="Engineer, Developer, Architect"></textarea>
           </div>
 
-          <div class="form-group">
-            <label for="linkedin-companies">
-              Companies
-              <span class="hint">Target companies</span>
-            </label>
-            <textarea id="linkedin-companies" rows="2" placeholder="Google, Meta, Apple"></textarea>
+          <!-- LinkedIn Facet Filters Section -->
+          <div class="facet-section">
+            <div class="facet-header">
+              <span class="facet-title">LinkedIn Filters</span>
+              <span class="hint">Search and select (uses LinkedIn's native filters)</span>
+            </div>
+
+            <!-- Location Filter (geoUrn) -->
+            <div class="form-group">
+              <label>
+                Location
+                <span class="hint">Geographic filters</span>
+              </label>
+              <div class="typeahead-container" data-type="GEO" data-param="geoUrn">
+                <input type="text" class="typeahead-input" placeholder="Search locations..." autocomplete="off">
+                <div class="typeahead-dropdown"></div>
+                <div class="selected-tags" id="selected-locations"></div>
+              </div>
+            </div>
+
+            <!-- Current Company Filter -->
+            <div class="form-group">
+              <label>
+                Current Company
+                <span class="hint">Where they work now</span>
+              </label>
+              <div class="typeahead-container" data-type="COMPANY" data-param="currentCompany">
+                <input type="text" class="typeahead-input" placeholder="Search companies..." autocomplete="off">
+                <div class="typeahead-dropdown"></div>
+                <div class="selected-tags" id="selected-current-company"></div>
+              </div>
+            </div>
+
+            <!-- Past Company Filter -->
+            <div class="form-group">
+              <label>
+                Past Company
+                <span class="hint">Where they worked before</span>
+              </label>
+              <div class="typeahead-container" data-type="COMPANY" data-param="pastCompany">
+                <input type="text" class="typeahead-input" placeholder="Search companies..." autocomplete="off">
+                <div class="typeahead-dropdown"></div>
+                <div class="selected-tags" id="selected-past-company"></div>
+              </div>
+            </div>
+
+            <!-- Industry Filter -->
+            <div class="form-group">
+              <label>
+                Industry
+                <span class="hint">Business sector</span>
+              </label>
+              <div class="typeahead-container" data-type="INDUSTRY" data-param="industry">
+                <input type="text" class="typeahead-input" placeholder="Search industries..." autocomplete="off">
+                <div class="typeahead-dropdown"></div>
+                <div class="selected-tags" id="selected-industry"></div>
+              </div>
+            </div>
+
+            <!-- School Filter -->
+            <div class="form-group">
+              <label>
+                School
+                <span class="hint">Education</span>
+              </label>
+              <div class="typeahead-container" data-type="SCHOOL" data-param="schoolFilter">
+                <input type="text" class="typeahead-input" placeholder="Search schools..." autocomplete="off">
+                <div class="typeahead-dropdown"></div>
+                <div class="selected-tags" id="selected-school"></div>
+              </div>
+            </div>
           </div>
 
           <div class="form-group">
             <label for="linkedin-exclusions">
               Exclusions
-              <span class="hint">Terms to exclude</span>
+              <span class="hint">Terms to exclude (in keywords)</span>
             </label>
             <input type="text" id="linkedin-exclusions" placeholder="recruiter, intern, manager">
           </div>
         </div>
 
-        <!-- Common: Locations -->
-        <div class="form-group">
+        <!-- Common: Locations (Google/GitHub only, LinkedIn uses faceted filters) -->
+        <div class="form-group non-linkedin-only">
           <label for="locations">
             Locations
             <span class="hint">Geographic filters</span>
@@ -213,6 +278,7 @@
   <!-- Toast Notification -->
   <div class="toast" id="toast"></div>
 
+  <script src="linkedin-api.js"></script>
   <script src="query-generator.js"></script>
   <script src="storage.js"></script>
   <script src="popup.js"></script>

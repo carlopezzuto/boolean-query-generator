@@ -41,8 +41,8 @@ const PLATFORMS = {
     supportsExplicitAnd: true,
     supportsExplicitOr: true,
     notSyntax: "NOT",
-    baseUrl: "https://www.linkedin.com/search/results/people/?keywords=",
-    fields: ["skills", "titles", "companies", "locations", "exclusions"]
+    baseUrl: "https://www.linkedin.com/search/results/people/",
+    fields: ["skills", "titles", "locations", "exclusions", "facets"]
   }
 };
 
@@ -273,15 +273,9 @@ function generateGitHubQueries(inputs) {
 // LinkedIn Query Generator
 // ============================================
 
-function generateLinkedInQueries(inputs, hackMode = false) {
+function generateLinkedInQueries(inputs, hackMode = false, facets = {}) {
   const queries = [];
-  const { skills, titles, companies, locations, exclusions } = inputs;
-
-  // Choose operator format based on hack mode
-  const andOp = hackMode ? "AND(" : "AND ";
-  const orOp = hackMode ? "OR(" : "OR ";
-  const notOp = hackMode ? "NOT(" : "NOT ";
-  const closeParen = hackMode ? ")" : "";
+  const { skills, titles, exclusions } = inputs;
 
   // Helper to join terms with OR
   function buildOrGroup(terms, useHack) {
@@ -311,6 +305,28 @@ function generateLinkedInQueries(inputs, hackMode = false) {
 
   const excludeStr = buildExclusions(exclusions, hackMode);
 
+  // Check if we have any facets selected
+  const hasFacets = facets && (
+    (facets.geoUrn && facets.geoUrn.length > 0) ||
+    (facets.currentCompany && facets.currentCompany.length > 0) ||
+    (facets.pastCompany && facets.pastCompany.length > 0) ||
+    (facets.industry && facets.industry.length > 0) ||
+    (facets.schoolFilter && facets.schoolFilter.length > 0)
+  );
+
+  // Build facet description for query labels
+  function getFacetDescription() {
+    const parts = [];
+    if (facets.geoUrn?.length) parts.push(`${facets.geoUrn.length} location(s)`);
+    if (facets.currentCompany?.length) parts.push(`${facets.currentCompany.length} current company(s)`);
+    if (facets.pastCompany?.length) parts.push(`${facets.pastCompany.length} past company(s)`);
+    if (facets.industry?.length) parts.push(`${facets.industry.length} industry(s)`);
+    if (facets.schoolFilter?.length) parts.push(`${facets.schoolFilter.length} school(s)`);
+    return parts.length > 0 ? ` + ${parts.join(", ")}` : "";
+  }
+
+  const facetDesc = getFacetDescription();
+
   // Pattern 1: All skills required (AND logic)
   if (skills.length > 0) {
     let skillPart;
@@ -328,44 +344,14 @@ function generateLinkedInQueries(inputs, hackMode = false) {
       ? (hackMode ? ` AND(${buildOrGroup(titles, hackMode)})` : ` AND ${buildOrGroup(titles, hackMode)}`)
       : "";
 
-    if (locations.length === 0 && companies.length === 0) {
-      const query = `${skillPart}${titlePart}${excludeStr}`.trim();
-      queries.push(createLinkedInQuery("Strict Skills", "All skills required", query, hackMode));
-    } else {
-      // With locations
-      if (locations.length > 0) {
-        const locationBatches = batchItems(locations, 3);
-        locationBatches.forEach((batch, i) => {
-          const locPart = hackMode
-            ? ` AND(${buildOrGroup(batch, hackMode)})`
-            : ` AND ${buildOrGroup(batch, hackMode)}`;
-          const query = `${skillPart}${titlePart}${locPart}${excludeStr}`.trim();
-          queries.push(createLinkedInQuery(
-            `Strict + Location ${i + 1}`,
-            `All skills, locations: ${batch.join(", ")}`,
-            query,
-            hackMode
-          ));
-        });
-      }
-
-      // With companies
-      if (companies.length > 0) {
-        const companyBatches = batchItems(companies, 3);
-        companyBatches.forEach((batch, i) => {
-          const compPart = hackMode
-            ? ` AND(${buildOrGroup(batch, hackMode)})`
-            : ` AND ${buildOrGroup(batch, hackMode)}`;
-          const query = `${skillPart}${titlePart}${compPart}${excludeStr}`.trim();
-          queries.push(createLinkedInQuery(
-            `Strict + Company ${i + 1}`,
-            `All skills, companies: ${batch.join(", ")}`,
-            query,
-            hackMode
-          ));
-        });
-      }
-    }
+    const query = `${skillPart}${titlePart}${excludeStr}`.trim();
+    queries.push(createLinkedInQuery(
+      `Strict Skills${facetDesc}`,
+      "All skills required" + (hasFacets ? " with LinkedIn filters" : ""),
+      query,
+      hackMode,
+      facets
+    ));
   }
 
   // Pattern 2: Any skill (OR logic)
@@ -376,62 +362,50 @@ function generateLinkedInQueries(inputs, hackMode = false) {
       ? (hackMode ? ` AND(${buildOrGroup(titles, hackMode)})` : ` AND ${buildOrGroup(titles, hackMode)}`)
       : "";
 
-    if (locations.length === 0 && companies.length === 0) {
-      const query = `${skillPart}${titlePart}${excludeStr}`.trim();
-      queries.push(createLinkedInQuery("Broad Skills", "Any skill matches", query, hackMode));
-    } else {
-      if (locations.length > 0) {
-        const locationBatches = batchItems(locations, 3);
-        locationBatches.forEach((batch, i) => {
-          const locPart = hackMode
-            ? ` AND(${buildOrGroup(batch, hackMode)})`
-            : ` AND ${buildOrGroup(batch, hackMode)}`;
-          const query = `${skillPart}${titlePart}${locPart}${excludeStr}`.trim();
-          queries.push(createLinkedInQuery(
-            `Broad + Location ${i + 1}`,
-            `Any skill, locations: ${batch.join(", ")}`,
-            query,
-            hackMode
-          ));
-        });
-      }
-
-      if (companies.length > 0) {
-        const companyBatches = batchItems(companies, 3);
-        companyBatches.forEach((batch, i) => {
-          const compPart = hackMode
-            ? ` AND(${buildOrGroup(batch, hackMode)})`
-            : ` AND ${buildOrGroup(batch, hackMode)}`;
-          const query = `${skillPart}${titlePart}${compPart}${excludeStr}`.trim();
-          queries.push(createLinkedInQuery(
-            `Broad + Company ${i + 1}`,
-            `Any skill, companies: ${batch.join(", ")}`,
-            query,
-            hackMode
-          ));
-        });
-      }
-    }
+    const query = `${skillPart}${titlePart}${excludeStr}`.trim();
+    queries.push(createLinkedInQuery(
+      `Broad Skills${facetDesc}`,
+      "Any skill matches" + (hasFacets ? " with LinkedIn filters" : ""),
+      query,
+      hackMode,
+      facets
+    ));
   }
 
-  // Pattern 3: Individual skill queries
-  if (skills.length > 2) {
+  // Pattern 3: Individual skill queries (only if no facets, to avoid too many queries)
+  if (skills.length > 2 && !hasFacets) {
     const titlePart = titles.length > 0
       ? (hackMode ? ` AND(${buildOrGroup(titles, hackMode)})` : ` AND ${buildOrGroup(titles, hackMode)}`)
       : "";
 
     skills.forEach(skill => {
       const query = `${formatTerm(skill)}${titlePart}${excludeStr}`.trim();
-      queries.push(createLinkedInQuery(`Single: ${skill}`, `Focus on ${skill}`, query, hackMode));
+      queries.push(createLinkedInQuery(`Single: ${skill}`, `Focus on ${skill}`, query, hackMode, facets));
     });
+  }
+
+  // If no skills but has facets, generate a basic query
+  if (skills.length === 0 && hasFacets) {
+    const titlePart = titles.length > 0 ? buildOrGroup(titles, hackMode) : "";
+    const query = titlePart ? `${titlePart}${excludeStr}`.trim() : "";
+    queries.push(createLinkedInQuery(
+      `Filters Only${facetDesc}`,
+      "Search with LinkedIn filters only",
+      query,
+      hackMode,
+      facets
+    ));
   }
 
   return queries;
 }
 
-function createLinkedInQuery(label, purpose, queryString, hackMode) {
+function createLinkedInQuery(label, purpose, queryString, hackMode, facets = {}) {
   const config = PLATFORMS.linkedin;
   const validation = validateLinkedIn(queryString, hackMode);
+
+  // Build URL with facet parameters
+  const url = buildLinkedInUrl(queryString, facets);
 
   return {
     platform: "linkedin",
@@ -443,9 +417,47 @@ function createLinkedInQuery(label, purpose, queryString, hackMode) {
     maxLength: config.maxLength,
     valid: validation.valid,
     validationMessage: validation.message,
-    url: config.baseUrl + escapeForUrl(queryString),
-    hackMode
+    url,
+    hackMode,
+    facets
   };
+}
+
+// Build LinkedIn search URL with facet parameters
+function buildLinkedInUrl(keywords, facets = {}) {
+  const baseUrl = PLATFORMS.linkedin.baseUrl;
+  const params = new URLSearchParams();
+
+  // Add keywords if present
+  if (keywords && keywords.trim()) {
+    params.set("keywords", keywords);
+  }
+
+  // Add facet parameters in LinkedIn's format: ["id1","id2"]
+  if (facets.geoUrn && facets.geoUrn.length > 0) {
+    params.set("geoUrn", JSON.stringify(facets.geoUrn));
+  }
+
+  if (facets.currentCompany && facets.currentCompany.length > 0) {
+    params.set("currentCompany", JSON.stringify(facets.currentCompany));
+  }
+
+  if (facets.pastCompany && facets.pastCompany.length > 0) {
+    params.set("pastCompany", JSON.stringify(facets.pastCompany));
+  }
+
+  if (facets.industry && facets.industry.length > 0) {
+    params.set("industry", JSON.stringify(facets.industry));
+  }
+
+  if (facets.schoolFilter && facets.schoolFilter.length > 0) {
+    params.set("schoolFilter", JSON.stringify(facets.schoolFilter));
+  }
+
+  // Add origin parameter (required by LinkedIn)
+  params.set("origin", "FACETED_SEARCH");
+
+  return baseUrl + "?" + params.toString();
 }
 
 // ============================================
@@ -497,13 +509,16 @@ function generateQueries(platform, inputs, options = {}) {
     keywords: parseList(inputs.keywords || "")
   };
 
+  // Get facets for LinkedIn (if present)
+  const facets = inputs.facets || {};
+
   let queries;
   if (platform === "google") {
     queries = generateGoogleQueries(cleanInputs);
   } else if (platform === "github") {
     queries = generateGitHubQueries(cleanInputs);
   } else if (platform === "linkedin") {
-    queries = generateLinkedInQueries(cleanInputs, options.hackMode || false);
+    queries = generateLinkedInQueries(cleanInputs, options.hackMode || false, facets);
   } else {
     queries = [];
   }
@@ -516,6 +531,7 @@ function generateQueries(platform, inputs, options = {}) {
     validQueries: queries.filter(q => q.valid).length,
     timestamp: new Date().toISOString(),
     inputs: cleanInputs,
+    facets,
     hackMode: options.hackMode || false
   };
 }
