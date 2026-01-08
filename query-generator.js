@@ -29,6 +29,20 @@ const PLATFORMS = {
     notSyntax: "-",
     baseUrl: "https://github.com/search?type=users&q=",
     fields: ["skills", "locations", "minFollowers", "keywords"]
+  },
+  linkedin: {
+    name: "linkedin",
+    displayName: "LinkedIn Search",
+    maxLength: 1000,
+    lengthUnit: "characters",
+    maxOperators: 6,           // Vanilla mode limit
+    maxOperatorsHack: 999,     // Hack mode (char limit only)
+    supportsParentheses: true,
+    supportsExplicitAnd: true,
+    supportsExplicitOr: true,
+    notSyntax: "NOT",
+    baseUrl: "https://www.linkedin.com/search/results/people/?keywords=",
+    fields: ["skills", "titles", "companies", "locations", "exclusions"]
   }
 };
 
@@ -82,8 +96,27 @@ function validateGitHub(query) {
   return { valid: true, message: "OK" };
 }
 
-function validate(platform, query) {
-  return platform === "google" ? validateGoogle(query) : validateGitHub(query);
+function validateLinkedIn(query, hackMode = false) {
+  if (query.length > 1000) {
+    return { valid: false, message: `Exceeds 1000 characters (${query.length})` };
+  }
+
+  // Count operators - both standard "AND term" and hack "AND(term)" formats
+  const operatorCount = (query.match(/\b(AND|OR|NOT)\b/g) || []).length;
+  const maxOps = hackMode ? PLATFORMS.linkedin.maxOperatorsHack : PLATFORMS.linkedin.maxOperators;
+
+  if (operatorCount > maxOps) {
+    return { valid: false, message: `Exceeds ${maxOps} operators (${operatorCount})` };
+  }
+
+  return { valid: true, message: "OK" };
+}
+
+function validate(platform, query, options = {}) {
+  if (platform === "google") return validateGoogle(query);
+  if (platform === "github") return validateGitHub(query);
+  if (platform === "linkedin") return validateLinkedIn(query, options.hackMode);
+  return { valid: false, message: "Unknown platform" };
 }
 
 // ============================================
@@ -237,6 +270,185 @@ function generateGitHubQueries(inputs) {
 }
 
 // ============================================
+// LinkedIn Query Generator
+// ============================================
+
+function generateLinkedInQueries(inputs, hackMode = false) {
+  const queries = [];
+  const { skills, titles, companies, locations, exclusions } = inputs;
+
+  // Choose operator format based on hack mode
+  const andOp = hackMode ? "AND(" : "AND ";
+  const orOp = hackMode ? "OR(" : "OR ";
+  const notOp = hackMode ? "NOT(" : "NOT ";
+  const closeParen = hackMode ? ")" : "";
+
+  // Helper to join terms with OR
+  function buildOrGroup(terms, useHack) {
+    if (terms.length === 0) return "";
+    if (terms.length === 1) return formatTerm(terms[0]);
+
+    if (useHack) {
+      // Hack format: (term1 OR(term2) OR(term3))
+      const first = formatTerm(terms[0]);
+      const rest = terms.slice(1).map(t => `OR(${formatTerm(t)})`).join(" ");
+      return `(${first} ${rest})`;
+    } else {
+      // Standard format: (term1 OR term2 OR term3)
+      return `(${terms.map(formatTerm).join(" OR ")})`;
+    }
+  }
+
+  // Helper to build exclusions
+  function buildExclusions(terms, useHack) {
+    if (terms.length === 0) return "";
+    if (useHack) {
+      return " " + terms.map(t => `NOT(${formatTerm(t)})`).join(" ");
+    } else {
+      return " " + terms.map(t => `NOT ${formatTerm(t)}`).join(" ");
+    }
+  }
+
+  const excludeStr = buildExclusions(exclusions, hackMode);
+
+  // Pattern 1: All skills required (AND logic)
+  if (skills.length > 0) {
+    let skillPart;
+    if (hackMode) {
+      // Hack: skill1 AND(skill2) AND(skill3)
+      const first = formatTerm(skills[0]);
+      const rest = skills.slice(1).map(s => `AND(${formatTerm(s)})`).join(" ");
+      skillPart = rest ? `${first} ${rest}` : first;
+    } else {
+      // Standard: skill1 AND skill2 AND skill3
+      skillPart = skills.map(formatTerm).join(" AND ");
+    }
+
+    const titlePart = titles.length > 0
+      ? (hackMode ? ` AND(${buildOrGroup(titles, hackMode)})` : ` AND ${buildOrGroup(titles, hackMode)}`)
+      : "";
+
+    if (locations.length === 0 && companies.length === 0) {
+      const query = `${skillPart}${titlePart}${excludeStr}`.trim();
+      queries.push(createLinkedInQuery("Strict Skills", "All skills required", query, hackMode));
+    } else {
+      // With locations
+      if (locations.length > 0) {
+        const locationBatches = batchItems(locations, 3);
+        locationBatches.forEach((batch, i) => {
+          const locPart = hackMode
+            ? ` AND(${buildOrGroup(batch, hackMode)})`
+            : ` AND ${buildOrGroup(batch, hackMode)}`;
+          const query = `${skillPart}${titlePart}${locPart}${excludeStr}`.trim();
+          queries.push(createLinkedInQuery(
+            `Strict + Location ${i + 1}`,
+            `All skills, locations: ${batch.join(", ")}`,
+            query,
+            hackMode
+          ));
+        });
+      }
+
+      // With companies
+      if (companies.length > 0) {
+        const companyBatches = batchItems(companies, 3);
+        companyBatches.forEach((batch, i) => {
+          const compPart = hackMode
+            ? ` AND(${buildOrGroup(batch, hackMode)})`
+            : ` AND ${buildOrGroup(batch, hackMode)}`;
+          const query = `${skillPart}${titlePart}${compPart}${excludeStr}`.trim();
+          queries.push(createLinkedInQuery(
+            `Strict + Company ${i + 1}`,
+            `All skills, companies: ${batch.join(", ")}`,
+            query,
+            hackMode
+          ));
+        });
+      }
+    }
+  }
+
+  // Pattern 2: Any skill (OR logic)
+  if (skills.length > 1) {
+    const skillPart = buildOrGroup(skills, hackMode);
+
+    const titlePart = titles.length > 0
+      ? (hackMode ? ` AND(${buildOrGroup(titles, hackMode)})` : ` AND ${buildOrGroup(titles, hackMode)}`)
+      : "";
+
+    if (locations.length === 0 && companies.length === 0) {
+      const query = `${skillPart}${titlePart}${excludeStr}`.trim();
+      queries.push(createLinkedInQuery("Broad Skills", "Any skill matches", query, hackMode));
+    } else {
+      if (locations.length > 0) {
+        const locationBatches = batchItems(locations, 3);
+        locationBatches.forEach((batch, i) => {
+          const locPart = hackMode
+            ? ` AND(${buildOrGroup(batch, hackMode)})`
+            : ` AND ${buildOrGroup(batch, hackMode)}`;
+          const query = `${skillPart}${titlePart}${locPart}${excludeStr}`.trim();
+          queries.push(createLinkedInQuery(
+            `Broad + Location ${i + 1}`,
+            `Any skill, locations: ${batch.join(", ")}`,
+            query,
+            hackMode
+          ));
+        });
+      }
+
+      if (companies.length > 0) {
+        const companyBatches = batchItems(companies, 3);
+        companyBatches.forEach((batch, i) => {
+          const compPart = hackMode
+            ? ` AND(${buildOrGroup(batch, hackMode)})`
+            : ` AND ${buildOrGroup(batch, hackMode)}`;
+          const query = `${skillPart}${titlePart}${compPart}${excludeStr}`.trim();
+          queries.push(createLinkedInQuery(
+            `Broad + Company ${i + 1}`,
+            `Any skill, companies: ${batch.join(", ")}`,
+            query,
+            hackMode
+          ));
+        });
+      }
+    }
+  }
+
+  // Pattern 3: Individual skill queries
+  if (skills.length > 2) {
+    const titlePart = titles.length > 0
+      ? (hackMode ? ` AND(${buildOrGroup(titles, hackMode)})` : ` AND ${buildOrGroup(titles, hackMode)}`)
+      : "";
+
+    skills.forEach(skill => {
+      const query = `${formatTerm(skill)}${titlePart}${excludeStr}`.trim();
+      queries.push(createLinkedInQuery(`Single: ${skill}`, `Focus on ${skill}`, query, hackMode));
+    });
+  }
+
+  return queries;
+}
+
+function createLinkedInQuery(label, purpose, queryString, hackMode) {
+  const config = PLATFORMS.linkedin;
+  const validation = validateLinkedIn(queryString, hackMode);
+
+  return {
+    platform: "linkedin",
+    label,
+    purpose,
+    query: queryString,
+    length: queryString.length,
+    lengthUnit: config.lengthUnit,
+    maxLength: config.maxLength,
+    valid: validation.valid,
+    validationMessage: validation.message,
+    url: config.baseUrl + escapeForUrl(queryString),
+    hackMode
+  };
+}
+
+// ============================================
 // Helper Functions
 // ============================================
 
@@ -273,7 +485,7 @@ function createQuery(platform, label, purpose, queryString) {
 // Main Generator Function
 // ============================================
 
-function generateQueries(platform, inputs) {
+function generateQueries(platform, inputs, options = {}) {
   // Clean inputs
   const cleanInputs = {
     skills: parseList(inputs.skills),
@@ -284,11 +496,18 @@ function generateQueries(platform, inputs) {
     minFollowers: parseInt(inputs.minFollowers) || 0,
     keywords: parseList(inputs.keywords || "")
   };
-  
-  const queries = platform === "google" 
-    ? generateGoogleQueries(cleanInputs)
-    : generateGitHubQueries(cleanInputs);
-  
+
+  let queries;
+  if (platform === "google") {
+    queries = generateGoogleQueries(cleanInputs);
+  } else if (platform === "github") {
+    queries = generateGitHubQueries(cleanInputs);
+  } else if (platform === "linkedin") {
+    queries = generateLinkedInQueries(cleanInputs, options.hackMode || false);
+  } else {
+    queries = [];
+  }
+
   return {
     platform,
     platformName: PLATFORMS[platform].displayName,
@@ -296,7 +515,8 @@ function generateQueries(platform, inputs) {
     totalQueries: queries.length,
     validQueries: queries.filter(q => q.valid).length,
     timestamp: new Date().toISOString(),
-    inputs: cleanInputs
+    inputs: cleanInputs,
+    hackMode: options.hackMode || false
   };
 }
 
