@@ -16,9 +16,19 @@ A Chrome extension that generates optimized boolean search queries for Google X-
 
 ## Installation
 
-### From Source (Developer Mode)
+### From Release (Recommended)
 
-1. Download or clone this repository
+1. Download the latest `boolean-query-generator-vX.X.X.zip` from [Releases](../../releases)
+2. Extract the ZIP file to a folder
+3. Open Chrome and navigate to `chrome://extensions/`
+4. Enable **Developer mode** (toggle in top-right corner)
+5. Click **Load unpacked**
+6. Select the extracted folder
+7. The extension icon will appear in your toolbar
+
+### From Source
+
+1. Clone this repository: `git clone https://github.com/carlopezzuto/boolean-query-generator.git`
 2. Open Chrome and navigate to `chrome://extensions/`
 3. Enable **Developer mode** (toggle in top-right corner)
 4. Click **Load unpacked**
@@ -27,7 +37,7 @@ A Chrome extension that generates optimized boolean search queries for Google X-
 
 ### From Chrome Web Store
 
-*(Coming soon after submission)*
+*(Coming soon)*
 
 ## Usage
 
