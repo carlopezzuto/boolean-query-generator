@@ -2,372 +2,96 @@
 // LinkedIn Voyager API Service
 // ============================================
 // Provides typeahead search for locations, companies, schools, and industries
+// Uses background service worker for reliable API calls
 // Requires user to be logged into LinkedIn (uses session cookie)
 
 const LinkedInAPI = {
-  // Base URL for Voyager API
-  baseUrl: "https://www.linkedin.com/voyager/api",
+  // Search for locations (geoUrn) - uses background script
+  async searchLocations(query) {
+    if (!query || query.length < 2) return [];
 
-  // Cache for API results (reduces API calls)
-  cache: new Map(),
-  cacheTimeout: 5 * 60 * 1000, // 5 minutes
-
-  // Stored cookies for API requests
-  cookies: null,
-  csrfToken: null,
-
-  // Get LinkedIn cookies using Chrome cookies API
-  async getLinkedInCookies() {
     try {
-      const cookies = await chrome.cookies.getAll({ domain: ".linkedin.com" });
-      const cookieMap = {};
-
-      for (const cookie of cookies) {
-        cookieMap[cookie.name] = cookie.value;
-      }
-
-      // Store CSRF token (JSESSIONID without quotes)
-      if (cookieMap.JSESSIONID) {
-        this.csrfToken = cookieMap.JSESSIONID.replace(/"/g, '');
-      }
-
-      // Build cookie string for header
-      this.cookies = cookies.map(c => `${c.name}=${c.value}`).join('; ');
-
-      return {
-        cookies: this.cookies,
-        csrfToken: this.csrfToken,
-        isAuthenticated: !!cookieMap.li_at
-      };
+      console.log("[LinkedIn API] Requesting locations via background:", query);
+      const results = await chrome.runtime.sendMessage({
+        action: "searchLocations",
+        query: query
+      });
+      console.log("[LinkedIn API] Received locations:", results?.length || 0);
+      return results || [];
     } catch (error) {
-      console.error("Error getting LinkedIn cookies:", error);
-      return { cookies: null, csrfToken: null, isAuthenticated: false };
+      console.error("[LinkedIn API] Error fetching locations:", error);
+      return [];
+    }
+  },
+
+  // Search for companies - uses background script
+  async searchCompanies(query) {
+    if (!query || query.length < 2) return [];
+
+    try {
+      console.log("[LinkedIn API] Requesting companies via background:", query);
+      const results = await chrome.runtime.sendMessage({
+        action: "searchCompanies",
+        query: query
+      });
+      console.log("[LinkedIn API] Received companies:", results?.length || 0);
+      return results || [];
+    } catch (error) {
+      console.error("[LinkedIn API] Error fetching companies:", error);
+      return [];
+    }
+  },
+
+  // Search for schools - uses background script
+  async searchSchools(query) {
+    if (!query || query.length < 2) return [];
+
+    try {
+      console.log("[LinkedIn API] Requesting schools via background:", query);
+      const results = await chrome.runtime.sendMessage({
+        action: "searchSchools",
+        query: query
+      });
+      console.log("[LinkedIn API] Received schools:", results?.length || 0);
+      return results || [];
+    } catch (error) {
+      console.error("[LinkedIn API] Error fetching schools:", error);
+      return [];
+    }
+  },
+
+  // Search for industries - uses background script with static fallback
+  async searchIndustries(query) {
+    if (!query || query.length < 2) return [];
+
+    try {
+      console.log("[LinkedIn API] Requesting industries via background:", query);
+      const results = await chrome.runtime.sendMessage({
+        action: "searchIndustries",
+        query: query
+      });
+      console.log("[LinkedIn API] Received industries:", results?.length || 0);
+
+      // If no results from API, use static fallback
+      if (!results || results.length === 0) {
+        return this.searchIndustriesStatic(query);
+      }
+
+      return results;
+    } catch (error) {
+      console.error("[LinkedIn API] Error fetching industries:", error);
+      return this.searchIndustriesStatic(query);
     }
   },
 
   // Check if user is authenticated with LinkedIn
   async isAuthenticated() {
-    const { isAuthenticated } = await this.getLinkedInCookies();
-    return isAuthenticated;
-  },
-
-  // Required headers for Voyager API
-  async getHeaders() {
-    // Ensure we have cookies
-    if (!this.cookies) {
-      await this.getLinkedInCookies();
-    }
-
-    const headers = {
-      "accept": "application/vnd.linkedin.normalized+json+2.1",
-      "accept-language": "en-US,en;q=0.9",
-      "x-restli-protocol-version": "2.0.0",
-      "x-li-lang": "en_US",
-      "x-li-track": '{"clientVersion":"1.0.0"}',
-    };
-
-    // Add CSRF token if available
-    if (this.csrfToken) {
-      headers["csrf-token"] = this.csrfToken;
-    }
-
-    // Add cookies header
-    if (this.cookies) {
-      headers["cookie"] = this.cookies;
-    }
-
-    return headers;
-  },
-
-  // Generate cache key
-  getCacheKey(type, query) {
-    return `${type}:${query.toLowerCase()}`;
-  },
-
-  // Get from cache if valid
-  getFromCache(type, query) {
-    const key = this.getCacheKey(type, query);
-    const cached = this.cache.get(key);
-    if (cached && Date.now() - cached.timestamp < this.cacheTimeout) {
-      return cached.data;
-    }
-    return null;
-  },
-
-  // Store in cache
-  setCache(type, query, data) {
-    const key = this.getCacheKey(type, query);
-    this.cache.set(key, { data, timestamp: Date.now() });
-  },
-
-  // Search for locations (geoUrn)
-  async searchLocations(query) {
-    if (!query || query.length < 2) return [];
-
-    const cached = this.getFromCache("GEO", query);
-    if (cached) return cached;
-
     try {
-      const url = `${this.baseUrl}/typeahead/hitsV2?keywords=${encodeURIComponent(query)}&origin=OTHER&q=type&type=GEO&queryContext=List(geoVersion->3,bingGeoSubTypeFilters->MARKET_AREA|COUNTRY_REGION|ADMIN_DIVISION_1|CITY)`;
-
-      const response = await fetch(url, {
-        method: "GET",
-        headers: await this.getHeaders()
-      });
-
-      if (!response.ok) {
-        console.warn("LinkedIn API error:", response.status);
-        return [];
-      }
-
-      const data = await response.json();
-      const results = this.parseTypeaheadResults(data, "GEO");
-      this.setCache("GEO", query, results);
-      return results;
+      const result = await chrome.runtime.sendMessage({ action: "checkAuth" });
+      return result || false;
     } catch (error) {
-      console.error("Error fetching locations:", error);
-      return [];
-    }
-  },
-
-  // Search for companies
-  async searchCompanies(query) {
-    if (!query || query.length < 2) return [];
-
-    const cached = this.getFromCache("COMPANY", query);
-    if (cached) return cached;
-
-    try {
-      const url = `${this.baseUrl}/typeahead/hitsV2?keywords=${encodeURIComponent(query)}&origin=OTHER&q=type&type=COMPANY`;
-
-      const response = await fetch(url, {
-        method: "GET",
-        headers: await this.getHeaders()
-      });
-
-      if (!response.ok) {
-        console.warn("LinkedIn API error:", response.status);
-        return [];
-      }
-
-      const data = await response.json();
-      const results = this.parseTypeaheadResults(data, "COMPANY");
-      this.setCache("COMPANY", query, results);
-      return results;
-    } catch (error) {
-      console.error("Error fetching companies:", error);
-      return [];
-    }
-  },
-
-  // Search for schools
-  async searchSchools(query) {
-    if (!query || query.length < 2) return [];
-
-    const cached = this.getFromCache("SCHOOL", query);
-    if (cached) return cached;
-
-    try {
-      const url = `${this.baseUrl}/typeahead/hitsV2?keywords=${encodeURIComponent(query)}&origin=OTHER&q=type&type=SCHOOL`;
-
-      const response = await fetch(url, {
-        method: "GET",
-        headers: await this.getHeaders()
-      });
-
-      if (!response.ok) {
-        console.warn("LinkedIn API error:", response.status);
-        return [];
-      }
-
-      const data = await response.json();
-      const results = this.parseTypeaheadResults(data, "SCHOOL");
-      this.setCache("SCHOOL", query, results);
-      return results;
-    } catch (error) {
-      console.error("Error fetching schools:", error);
-      return [];
-    }
-  },
-
-  // Search for industries
-  async searchIndustries(query) {
-    if (!query || query.length < 2) return [];
-
-    const cached = this.getFromCache("INDUSTRY", query);
-    if (cached) return cached;
-
-    try {
-      const url = `${this.baseUrl}/typeahead/hitsV2?keywords=${encodeURIComponent(query)}&origin=OTHER&q=type&type=INDUSTRY`;
-
-      const response = await fetch(url, {
-        method: "GET",
-        headers: await this.getHeaders()
-      });
-
-      if (!response.ok) {
-        console.warn("LinkedIn API error:", response.status);
-        // Fall back to static list
-        return this.searchIndustriesStatic(query);
-      }
-
-      const data = await response.json();
-      const results = this.parseTypeaheadResults(data, "INDUSTRY");
-      this.setCache("INDUSTRY", query, results);
-      return results;
-    } catch (error) {
-      console.error("Error fetching industries:", error);
-      return this.searchIndustriesStatic(query);
-    }
-  },
-
-  // Parse typeahead API response
-  parseTypeaheadResults(data, type) {
-    const results = [];
-
-    try {
-      // The response structure varies, try different paths
-      const elements = data.elements || data.included || [];
-
-      for (const element of elements) {
-        let item = null;
-
-        // Try to extract based on type
-        if (type === "GEO") {
-          item = this.parseGeoResult(element);
-        } else if (type === "COMPANY") {
-          item = this.parseCompanyResult(element);
-        } else if (type === "SCHOOL") {
-          item = this.parseSchoolResult(element);
-        } else if (type === "INDUSTRY") {
-          item = this.parseIndustryResult(element);
-        }
-
-        if (item) {
-          results.push(item);
-        }
-      }
-
-      // Also check included array for additional data
-      if (data.included) {
-        for (const inc of data.included) {
-          let item = null;
-
-          if (type === "GEO" && inc.$type?.includes("Geo")) {
-            item = this.parseGeoResult(inc);
-          } else if (type === "COMPANY" && inc.$type?.includes("Company")) {
-            item = this.parseCompanyResult(inc);
-          } else if (type === "SCHOOL" && inc.$type?.includes("School")) {
-            item = this.parseSchoolResult(inc);
-          } else if (type === "INDUSTRY" && inc.$type?.includes("Industry")) {
-            item = this.parseIndustryResult(inc);
-          }
-
-          if (item && !results.some(r => r.id === item.id)) {
-            results.push(item);
-          }
-        }
-      }
-    } catch (error) {
-      console.error("Error parsing typeahead results:", error);
-    }
-
-    return results.slice(0, 10); // Limit to 10 results
-  },
-
-  // Parse geo/location result
-  parseGeoResult(element) {
-    try {
-      // Extract ID from URN like "urn:li:geo:103644278"
-      const urn = element.entityUrn || element.targetUrn || element.objectUrn || "";
-      const idMatch = urn.match(/urn:li:geo:(\d+)/);
-      if (!idMatch) return null;
-
-      const id = idMatch[1];
-      const name = element.text?.text || element.title?.text || element.defaultLocalizedName || element.name || "";
-
-      if (!name) return null;
-
-      return {
-        id,
-        name,
-        type: "GEO",
-        urn: `urn:li:geo:${id}`
-      };
-    } catch (error) {
-      return null;
-    }
-  },
-
-  // Parse company result
-  parseCompanyResult(element) {
-    try {
-      // Extract ID from URN like "urn:li:company:1441" or "urn:li:fs_miniCompany:1441"
-      const urn = element.entityUrn || element.targetUrn || element.objectUrn || "";
-      const idMatch = urn.match(/urn:li:(?:fs_mini)?[Cc]ompany:(\d+)/);
-      if (!idMatch) return null;
-
-      const id = idMatch[1];
-      const name = element.text?.text || element.title?.text || element.name || element.universalName || "";
-
-      if (!name) return null;
-
-      return {
-        id,
-        name,
-        type: "COMPANY",
-        urn: `urn:li:company:${id}`
-      };
-    } catch (error) {
-      return null;
-    }
-  },
-
-  // Parse school result
-  parseSchoolResult(element) {
-    try {
-      // Extract ID from URN like "urn:li:school:2584" or "urn:li:fs_miniSchool:2584"
-      const urn = element.entityUrn || element.targetUrn || element.objectUrn || "";
-      const idMatch = urn.match(/urn:li:(?:fs_mini)?[Ss]chool:(\d+)/);
-      if (!idMatch) return null;
-
-      const id = idMatch[1];
-      const name = element.text?.text || element.title?.text || element.name || element.schoolName || "";
-
-      if (!name) return null;
-
-      return {
-        id,
-        name,
-        type: "SCHOOL",
-        urn: `urn:li:school:${id}`
-      };
-    } catch (error) {
-      return null;
-    }
-  },
-
-  // Parse industry result
-  parseIndustryResult(element) {
-    try {
-      // Extract ID from URN like "urn:li:industry:47"
-      const urn = element.entityUrn || element.targetUrn || element.objectUrn || "";
-      const idMatch = urn.match(/urn:li:industry:(\d+)/);
-      if (!idMatch) return null;
-
-      const id = idMatch[1];
-      const name = element.text?.text || element.title?.text || element.name || element.localizedName || "";
-
-      if (!name) return null;
-
-      return {
-        id,
-        name,
-        type: "INDUSTRY",
-        urn: `urn:li:industry:${id}`
-      };
-    } catch (error) {
-      return null;
+      console.error("[LinkedIn API] Error checking auth:", error);
+      return false;
     }
   },
 
@@ -377,26 +101,6 @@ const LinkedInAPI = {
     return INDUSTRIES_LIST.filter(ind =>
       ind.name.toLowerCase().includes(lowerQuery)
     ).slice(0, 10);
-  },
-
-  // Check if user is logged into LinkedIn
-  async checkAuth() {
-    try {
-      // First check if we have the li_at cookie
-      const hasAuth = await this.isAuthenticated();
-      if (!hasAuth) {
-        return false;
-      }
-
-      // Verify with API call
-      const response = await fetch("https://www.linkedin.com/voyager/api/me", {
-        method: "GET",
-        headers: await this.getHeaders()
-      });
-      return response.ok;
-    } catch (error) {
-      return false;
-    }
   }
 };
 
