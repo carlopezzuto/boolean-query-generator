@@ -727,9 +727,22 @@ function initSettings() {
   const cookieForm = document.getElementById("cookie-form");
   const testBtn = document.getElementById("test-cookies-btn");
   const clearBtn = document.getElementById("clear-cookies-btn");
+  const importBtn = document.getElementById("import-cookies-btn");
+  const instructionsToggle = document.querySelector(".instructions-toggle");
 
   // Load existing cookies into form
   loadSavedCookies();
+
+  // Import from LinkedIn tab button
+  importBtn.addEventListener("click", async () => {
+    await importFromLinkedIn();
+  });
+
+  // Toggle instructions visibility
+  instructionsToggle.addEventListener("click", () => {
+    const instructions = document.getElementById("cookie-instructions");
+    instructions.classList.toggle("collapsed");
+  });
 
   // Save cookies form submit
   cookieForm.addEventListener("submit", async (e) => {
@@ -751,6 +764,46 @@ function initSettings() {
 
   // Initial auth status check
   refreshAuthStatus();
+}
+
+async function importFromLinkedIn() {
+  const importBtn = document.getElementById("import-cookies-btn");
+  const importResult = document.getElementById("import-result");
+  const resultText = importResult.querySelector(".import-result-text");
+
+  // Disable button during import
+  importBtn.disabled = true;
+  importBtn.textContent = "Importing...";
+
+  try {
+    const result = await chrome.runtime.sendMessage({ action: "importFromTab" });
+
+    importResult.style.display = "block";
+    importResult.classList.remove("success", "error");
+
+    if (result.success) {
+      importResult.classList.add("success");
+      resultText.textContent = `✓ ${result.message}`;
+      showToast("Cookies imported successfully!", "success");
+
+      // Reload the saved cookies into form
+      await loadSavedCookies();
+      // Refresh auth status
+      await refreshAuthStatus();
+    } else {
+      importResult.classList.add("error");
+      resultText.textContent = `✗ ${result.error}`;
+      showToast("Import failed", "error");
+    }
+  } catch (error) {
+    importResult.style.display = "block";
+    importResult.classList.add("error");
+    resultText.textContent = `✗ Error: ${error.message}`;
+    showToast("Import error", "error");
+  } finally {
+    importBtn.disabled = false;
+    importBtn.textContent = "🔗 Import Cookies from LinkedIn Tab";
+  }
 }
 
 async function loadSavedCookies() {

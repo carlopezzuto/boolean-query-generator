@@ -271,12 +271,30 @@
 
         <div class="settings-info">
           <p>The LinkedIn filters (Location, Company, School, Industry) require authentication to work.</p>
-          <p>If automatic cookie detection isn't working, you can manually provide your LinkedIn cookies below.</p>
         </div>
 
-        <div class="cookie-instructions">
-          <h4>How to get your LinkedIn cookies:</h4>
-          <ol>
+        <!-- Quick Import Section -->
+        <div class="import-section">
+          <h4>Quick Import (Recommended)</h4>
+          <p>Open LinkedIn in a tab, make sure you're logged in, then click the button below:</p>
+          <button type="button" class="btn btn-primary btn-import" id="import-cookies-btn">
+            🔗 Import Cookies from LinkedIn Tab
+          </button>
+          <div class="import-result" id="import-result" style="display: none;">
+            <span class="import-result-text"></span>
+          </div>
+        </div>
+
+        <div class="settings-divider">
+          <span>or enter manually</span>
+        </div>
+
+        <div class="cookie-instructions collapsed" id="cookie-instructions">
+          <h4 class="instructions-toggle">
+            How to get your LinkedIn cookies manually
+            <span class="toggle-icon">▼</span>
+          </h4>
+          <ol class="instructions-list">
             <li>Open <a href="https://www.linkedin.com" target="_blank">linkedin.com</a> and make sure you're logged in</li>
             <li>Press <kbd>F12</kbd> to open Developer Tools</li>
             <li>Go to <strong>Application</strong> tab (Chrome) or <strong>Storage</strong> tab (Firefox)</li>

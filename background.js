@@ -70,11 +70,40 @@ async function getLinkedInCookies() {
   // Fall back to automatic cookie capture
   try {
     console.log("[Background] Trying automatic cookie capture...");
-    const cookies = await chrome.cookies.getAll({ domain: ".linkedin.com" });
-    console.log("[Background] Found", cookies.length, "cookies from .linkedin.com");
+
+    // Try multiple methods to get cookies
+    let cookies = [];
+
+    // Method 1: Get by URL (more reliable in some cases)
+    try {
+      cookies = await chrome.cookies.getAll({ url: "https://www.linkedin.com" });
+      console.log("[Background] Method 1 (URL): Found", cookies.length, "cookies");
+    } catch (e) {
+      console.log("[Background] Method 1 failed:", e.message);
+    }
+
+    // Method 2: Get by domain if URL method failed
+    if (cookies.length === 0) {
+      try {
+        cookies = await chrome.cookies.getAll({ domain: ".linkedin.com" });
+        console.log("[Background] Method 2 (domain): Found", cookies.length, "cookies");
+      } catch (e) {
+        console.log("[Background] Method 2 failed:", e.message);
+      }
+    }
+
+    // Method 3: Try specific cookies by name
+    if (cookies.length === 0) {
+      console.log("[Background] Trying to get specific cookies...");
+      const liAtCookie = await chrome.cookies.get({ url: "https://www.linkedin.com", name: "li_at" });
+      const jsessionCookie = await chrome.cookies.get({ url: "https://www.linkedin.com", name: "JSESSIONID" });
+
+      if (liAtCookie) cookies.push(liAtCookie);
+      if (jsessionCookie) cookies.push(jsessionCookie);
+      console.log("[Background] Method 3 (specific): Found", cookies.length, "cookies");
+    }
 
     const cookieMap = {};
-
     for (const cookie of cookies) {
       cookieMap[cookie.name] = cookie.value;
     }
@@ -100,6 +129,66 @@ async function getLinkedInCookies() {
   } catch (error) {
     console.error("[Background] Error getting LinkedIn cookies:", error);
     return { cookies: null, csrfToken: null, isAuthenticated: false, source: "none" };
+  }
+}
+
+// Import cookies from LinkedIn tab (when user is on linkedin.com)
+async function importCookiesFromTab() {
+  try {
+    // Get the current active tab
+    const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+
+    if (!tab || !tab.url) {
+      return { success: false, error: "No active tab found" };
+    }
+
+    // Check if we're on LinkedIn
+    if (!tab.url.includes("linkedin.com")) {
+      return {
+        success: false,
+        error: "Please navigate to linkedin.com first, then try again",
+        currentUrl: tab.url
+      };
+    }
+
+    console.log("[Background] Importing cookies from LinkedIn tab:", tab.url);
+
+    // Get cookies for this specific tab's URL
+    const cookies = await chrome.cookies.getAll({ url: tab.url });
+    console.log("[Background] Found", cookies.length, "cookies from tab URL");
+
+    // Also try the main linkedin.com URL
+    const mainCookies = await chrome.cookies.getAll({ url: "https://www.linkedin.com" });
+    console.log("[Background] Found", mainCookies.length, "cookies from main URL");
+
+    // Merge cookies, preferring tab cookies
+    const cookieMap = {};
+    for (const cookie of [...mainCookies, ...cookies]) {
+      cookieMap[cookie.name] = cookie.value;
+    }
+
+    const liAt = cookieMap.li_at;
+    const jsessionId = cookieMap.JSESSIONID;
+
+    if (!liAt || !jsessionId) {
+      return {
+        success: false,
+        error: `Missing required cookies. Found: li_at=${!!liAt}, JSESSIONID=${!!jsessionId}. Make sure you're logged into LinkedIn.`,
+        cookieCount: Object.keys(cookieMap).length
+      };
+    }
+
+    // Save as manual cookies
+    await saveManualCookies(liAt, jsessionId);
+
+    return {
+      success: true,
+      message: "Cookies imported successfully!",
+      cookieCount: Object.keys(cookieMap).length
+    };
+  } catch (error) {
+    console.error("[Background] Error importing cookies:", error);
+    return { success: false, error: `Import failed: ${error.message}` };
   }
 }
 
@@ -539,6 +628,11 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
 
   if (request.action === "testConnection") {
     testConnection().then(sendResponse);
+    return true;
+  }
+
+  if (request.action === "importFromTab") {
+    importCookiesFromTab().then(sendResponse);
     return true;
   }
 
