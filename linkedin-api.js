@@ -19,8 +19,12 @@ const LinkedInAPI = {
     if (!query || query.length < 2) return [];
     const lowerQuery = query.toLowerCase();
     return COMPANIES_LIST.filter(company =>
-      company.name.toLowerCase().includes(lowerQuery)
-    ).slice(0, 10);
+      (company.displayName || company.name || '').toLowerCase().includes(lowerQuery)
+    ).map(company => ({
+      id: company.id,
+      name: company.displayName || company.name,
+      type: company.type
+    })).slice(0, 10);
   },
 
   // Search for schools - uses companies list (schools are companies on LinkedIn)
@@ -30,10 +34,14 @@ const LinkedInAPI = {
     // Filter for educational keywords
     const eduKeywords = ['university', 'college', 'school', 'institute', 'academy', 'education'];
     return COMPANIES_LIST.filter(company => {
-      const nameLower = company.name.toLowerCase();
+      const nameLower = (company.displayName || company.name || '').toLowerCase();
       return nameLower.includes(lowerQuery) &&
              eduKeywords.some(kw => nameLower.includes(kw));
-    }).slice(0, 10);
+    }).map(company => ({
+      id: company.id,
+      name: company.displayName || company.name,
+      type: company.type
+    })).slice(0, 10);
   },
 
   // Search for industries - client-side filtering
