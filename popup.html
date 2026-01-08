@@ -50,6 +50,20 @@
 
       <!-- Input Form -->
       <form id="query-form">
+        <!-- LinkedIn Hack Toggle (before skills) -->
+        <div class="linkedin-only" style="display: none;">
+          <div class="form-group hack-toggle hack-toggle-top">
+            <label class="toggle-label">
+              <input type="checkbox" id="linkedin-hack-mode">
+              <span class="toggle-switch"></span>
+              <span class="toggle-text">
+                <strong>Operator Hack Mode</strong>
+                <span class="hint">Uses AND(term) syntax to bypass 6 operator limit</span>
+              </span>
+            </label>
+          </div>
+        </div>
+
         <!-- Common Fields -->
         <div class="form-group">
           <label for="skills">
@@ -129,17 +143,6 @@
               <span class="hint">Terms to exclude</span>
             </label>
             <input type="text" id="linkedin-exclusions" placeholder="recruiter, intern, manager">
-          </div>
-
-          <div class="form-group hack-toggle">
-            <label class="toggle-label">
-              <input type="checkbox" id="linkedin-hack-mode">
-              <span class="toggle-switch"></span>
-              <span class="toggle-text">
-                <strong>Operator Hack Mode</strong>
-                <span class="hint">Uses AND(term) syntax to bypass 6 operator limit</span>
-              </span>
-            </label>
           </div>
         </div>
 
