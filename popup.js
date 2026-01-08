@@ -53,13 +53,20 @@ function initPlatformSelector() {
 function updateFieldVisibility(platform) {
   const googleFields = document.querySelector(".google-only");
   const githubFields = document.querySelector(".github-only");
+  const linkedinFields = document.querySelector(".linkedin-only");
 
+  // Hide all platform-specific fields first
+  googleFields.style.display = "none";
+  githubFields.style.display = "none";
+  linkedinFields.style.display = "none";
+
+  // Show fields for selected platform
   if (platform === "google") {
     googleFields.style.display = "block";
-    githubFields.style.display = "none";
-  } else {
-    googleFields.style.display = "none";
+  } else if (platform === "github") {
     githubFields.style.display = "block";
+  } else if (platform === "linkedin") {
+    linkedinFields.style.display = "block";
   }
 }
 
@@ -88,25 +95,51 @@ function initForm() {
 }
 
 function getFormData() {
-  return {
+  const platform = getSelectedPlatform();
+
+  // Base fields
+  const data = {
     skills: document.getElementById("skills").value,
-    titles: document.getElementById("titles").value,
-    companies: document.getElementById("companies").value,
-    locations: document.getElementById("locations").value,
-    exclusions: document.getElementById("exclusions").value,
-    minFollowers: document.getElementById("minFollowers").value,
-    keywords: document.getElementById("keywords").value
+    locations: document.getElementById("locations").value
   };
+
+  // Platform-specific fields
+  if (platform === "google") {
+    data.titles = document.getElementById("titles").value;
+    data.companies = document.getElementById("companies").value;
+    data.exclusions = document.getElementById("exclusions").value;
+  } else if (platform === "github") {
+    data.minFollowers = document.getElementById("minFollowers").value;
+    data.keywords = document.getElementById("keywords").value;
+  } else if (platform === "linkedin") {
+    data.titles = document.getElementById("linkedin-titles").value;
+    data.companies = document.getElementById("linkedin-companies").value;
+    data.exclusions = document.getElementById("linkedin-exclusions").value;
+    data.hackMode = document.getElementById("linkedin-hack-mode").checked;
+  }
+
+  return data;
 }
 
-function setFormData(data) {
+function setFormData(data, platform) {
+  // Common fields
   document.getElementById("skills").value = data.skills?.join?.(", ") || data.skills || "";
+  document.getElementById("locations").value = data.locations?.join?.(", ") || data.locations || "";
+
+  // Google fields
   document.getElementById("titles").value = data.titles?.join?.(", ") || data.titles || "";
   document.getElementById("companies").value = data.companies?.join?.(", ") || data.companies || "";
-  document.getElementById("locations").value = data.locations?.join?.(", ") || data.locations || "";
   document.getElementById("exclusions").value = data.exclusions?.join?.(", ") || data.exclusions || "";
+
+  // GitHub fields
   document.getElementById("minFollowers").value = data.minFollowers || "";
   document.getElementById("keywords").value = data.keywords?.join?.(", ") || data.keywords || "";
+
+  // LinkedIn fields
+  document.getElementById("linkedin-titles").value = data.titles?.join?.(", ") || data.titles || "";
+  document.getElementById("linkedin-companies").value = data.companies?.join?.(", ") || data.companies || "";
+  document.getElementById("linkedin-exclusions").value = data.exclusions?.join?.(", ") || data.exclusions || "";
+  document.getElementById("linkedin-hack-mode").checked = data.hackMode || false;
 }
 
 // ============================================
@@ -120,12 +153,18 @@ function handleGenerate() {
   const inputs = getFormData();
 
   // Validate minimum input
-  if (!inputs.skills.trim() && !inputs.locations.trim() && !inputs.keywords.trim()) {
+  if (!inputs.skills.trim() && !inputs.locations.trim() && !inputs.keywords?.trim()) {
     showToast("Please enter at least skills, locations, or keywords", "error");
     return;
   }
 
-  currentQuerySet = generateQueries(platform, inputs);
+  // Build options for generator
+  const options = {};
+  if (platform === "linkedin") {
+    options.hackMode = inputs.hackMode || false;
+  }
+
+  currentQuerySet = generateQueries(platform, inputs, options);
 
   if (currentQuerySet.queries.length === 0) {
     showToast("No queries generated. Check your inputs.", "error");

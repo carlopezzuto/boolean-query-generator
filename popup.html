@@ -31,6 +31,14 @@
           </span>
         </label>
         <label class="platform-option">
+          <input type="radio" name="platform" value="linkedin">
+          <span class="platform-label">
+            <span class="platform-icon">💼</span>
+            <span class="platform-name">LinkedIn Search</span>
+            <span class="platform-desc">Native LinkedIn people search</span>
+          </span>
+        </label>
+        <label class="platform-option">
           <input type="radio" name="platform" value="github">
           <span class="platform-label">
             <span class="platform-icon">🐙</span>
@@ -94,6 +102,44 @@
               <span class="hint">Search in bio/name</span>
             </label>
             <input type="text" id="keywords" placeholder="backend, distributed systems">
+          </div>
+        </div>
+
+        <!-- LinkedIn-only Fields -->
+        <div class="linkedin-only" style="display: none;">
+          <div class="form-group">
+            <label for="linkedin-titles">
+              Titles
+              <span class="hint">Job titles to match</span>
+            </label>
+            <textarea id="linkedin-titles" rows="2" placeholder="Engineer, Developer, Architect"></textarea>
+          </div>
+
+          <div class="form-group">
+            <label for="linkedin-companies">
+              Companies
+              <span class="hint">Target companies</span>
+            </label>
+            <textarea id="linkedin-companies" rows="2" placeholder="Google, Meta, Apple"></textarea>
+          </div>
+
+          <div class="form-group">
+            <label for="linkedin-exclusions">
+              Exclusions
+              <span class="hint">Terms to exclude</span>
+            </label>
+            <input type="text" id="linkedin-exclusions" placeholder="recruiter, intern, manager">
+          </div>
+
+          <div class="form-group hack-toggle">
+            <label class="toggle-label">
+              <input type="checkbox" id="linkedin-hack-mode">
+              <span class="toggle-switch"></span>
+              <span class="toggle-text">
+                <strong>Operator Hack Mode</strong>
+                <span class="hint">Uses AND(term) syntax to bypass 6 operator limit</span>
+              </span>
+            </label>
           </div>
         </div>
 
