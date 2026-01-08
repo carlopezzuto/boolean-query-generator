@@ -12,15 +12,71 @@ const LinkedInAPI = {
   cache: new Map(),
   cacheTimeout: 5 * 60 * 1000, // 5 minutes
 
+  // Stored cookies for API requests
+  cookies: null,
+  csrfToken: null,
+
+  // Get LinkedIn cookies using Chrome cookies API
+  async getLinkedInCookies() {
+    try {
+      const cookies = await chrome.cookies.getAll({ domain: ".linkedin.com" });
+      const cookieMap = {};
+
+      for (const cookie of cookies) {
+        cookieMap[cookie.name] = cookie.value;
+      }
+
+      // Store CSRF token (JSESSIONID without quotes)
+      if (cookieMap.JSESSIONID) {
+        this.csrfToken = cookieMap.JSESSIONID.replace(/"/g, '');
+      }
+
+      // Build cookie string for header
+      this.cookies = cookies.map(c => `${c.name}=${c.value}`).join('; ');
+
+      return {
+        cookies: this.cookies,
+        csrfToken: this.csrfToken,
+        isAuthenticated: !!cookieMap.li_at
+      };
+    } catch (error) {
+      console.error("Error getting LinkedIn cookies:", error);
+      return { cookies: null, csrfToken: null, isAuthenticated: false };
+    }
+  },
+
+  // Check if user is authenticated with LinkedIn
+  async isAuthenticated() {
+    const { isAuthenticated } = await this.getLinkedInCookies();
+    return isAuthenticated;
+  },
+
   // Required headers for Voyager API
-  getHeaders() {
-    return {
+  async getHeaders() {
+    // Ensure we have cookies
+    if (!this.cookies) {
+      await this.getLinkedInCookies();
+    }
+
+    const headers = {
       "accept": "application/vnd.linkedin.normalized+json+2.1",
       "accept-language": "en-US,en;q=0.9",
       "x-restli-protocol-version": "2.0.0",
       "x-li-lang": "en_US",
       "x-li-track": '{"clientVersion":"1.0.0"}',
     };
+
+    // Add CSRF token if available
+    if (this.csrfToken) {
+      headers["csrf-token"] = this.csrfToken;
+    }
+
+    // Add cookies header
+    if (this.cookies) {
+      headers["cookie"] = this.cookies;
+    }
+
+    return headers;
   },
 
   // Generate cache key
@@ -56,8 +112,7 @@ const LinkedInAPI = {
 
       const response = await fetch(url, {
         method: "GET",
-        headers: this.getHeaders(),
-        credentials: "include" // Include cookies for authentication
+        headers: await this.getHeaders()
       });
 
       if (!response.ok) {
@@ -87,8 +142,7 @@ const LinkedInAPI = {
 
       const response = await fetch(url, {
         method: "GET",
-        headers: this.getHeaders(),
-        credentials: "include"
+        headers: await this.getHeaders()
       });
 
       if (!response.ok) {
@@ -118,8 +172,7 @@ const LinkedInAPI = {
 
       const response = await fetch(url, {
         method: "GET",
-        headers: this.getHeaders(),
-        credentials: "include"
+        headers: await this.getHeaders()
       });
 
       if (!response.ok) {
@@ -149,8 +202,7 @@ const LinkedInAPI = {
 
       const response = await fetch(url, {
         method: "GET",
-        headers: this.getHeaders(),
-        credentials: "include"
+        headers: await this.getHeaders()
       });
 
       if (!response.ok) {
@@ -330,10 +382,16 @@ const LinkedInAPI = {
   // Check if user is logged into LinkedIn
   async checkAuth() {
     try {
+      // First check if we have the li_at cookie
+      const hasAuth = await this.isAuthenticated();
+      if (!hasAuth) {
+        return false;
+      }
+
+      // Verify with API call
       const response = await fetch("https://www.linkedin.com/voyager/api/me", {
         method: "GET",
-        headers: this.getHeaders(),
-        credentials: "include"
+        headers: await this.getHeaders()
       });
       return response.ok;
     } catch (error) {
