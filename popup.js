@@ -543,49 +543,35 @@ function initTypeaheads() {
     const type = container.dataset.type;
     const param = container.dataset.param;
 
-    // Debounced search function
-    const debouncedSearch = debounce(async (query) => {
+    // Debounced search function (synchronous - uses static data)
+    const debouncedSearch = debounce((query) => {
       if (query.length < 2) {
         dropdown.classList.remove("show");
         return;
       }
 
-      // Show loading state
-      dropdown.innerHTML = '<div class="typeahead-loading">Searching...</div>';
       dropdown.classList.add("show");
 
-      try {
-        let results = [];
+      let results = [];
 
-        // Call appropriate API based on type
-        if (type === "GEO") {
-          results = await LinkedInAPI.searchLocations(query);
-        } else if (type === "COMPANY") {
-          results = await LinkedInAPI.searchCompanies(query);
-        } else if (type === "SCHOOL") {
-          results = await LinkedInAPI.searchSchools(query);
-        } else if (type === "INDUSTRY") {
-          results = await LinkedInAPI.searchIndustries(query);
-        }
-
-        if (results.length === 0) {
-          // If API returned nothing, try static fallback for industries
-          if (type === "INDUSTRY") {
-            results = LinkedInAPI.searchIndustriesStatic(query);
-          }
-
-          if (results.length === 0) {
-            dropdown.innerHTML = '<div class="typeahead-empty">No results found. Try a different search term.</div>';
-            return;
-          }
-        }
-
-        renderDropdownResults(dropdown, results, param, tagsContainer);
-      } catch (error) {
-        console.error("Typeahead error:", error);
-        dropdown.innerHTML = '<div class="typeahead-error">Error searching. Make sure you\'re logged into LinkedIn.</div>';
+      // Call appropriate search based on type (all synchronous now)
+      if (type === "GEO") {
+        results = LinkedInAPI.searchLocations(query);
+      } else if (type === "COMPANY") {
+        results = LinkedInAPI.searchCompanies(query);
+      } else if (type === "SCHOOL") {
+        results = LinkedInAPI.searchSchools(query);
+      } else if (type === "INDUSTRY") {
+        results = LinkedInAPI.searchIndustries(query);
       }
-    }, 300);
+
+      if (results.length === 0) {
+        dropdown.innerHTML = '<div class="typeahead-empty">No results found. Try a different search term.</div>';
+        return;
+      }
+
+      renderDropdownResults(dropdown, results, param, tagsContainer);
+    }, 150);
 
     // Input event listener
     input.addEventListener("input", (e) => {
@@ -720,198 +706,23 @@ function formatTimestamp(isoString) {
 }
 
 // ============================================
-// Settings / Cookie Management
+// Settings - Data Stats Display
 // ============================================
 
 function initSettings() {
-  const cookieForm = document.getElementById("cookie-form");
-  const testBtn = document.getElementById("test-cookies-btn");
-  const clearBtn = document.getElementById("clear-cookies-btn");
-  const importBtn = document.getElementById("import-cookies-btn");
-  const instructionsToggle = document.querySelector(".instructions-toggle");
-
-  // Load existing cookies into form
-  loadSavedCookies();
-
-  // Import from LinkedIn tab button
-  importBtn.addEventListener("click", async () => {
-    await importFromLinkedIn();
-  });
-
-  // Toggle instructions visibility
-  instructionsToggle.addEventListener("click", () => {
-    const instructions = document.getElementById("cookie-instructions");
-    instructions.classList.toggle("collapsed");
-  });
-
-  // Save cookies form submit
-  cookieForm.addEventListener("submit", async (e) => {
-    e.preventDefault();
-    await saveCookies();
-  });
-
-  // Test connection button
-  testBtn.addEventListener("click", async () => {
-    await testConnection();
-  });
-
-  // Clear cookies button
-  clearBtn.addEventListener("click", async () => {
-    if (confirm("Clear saved cookies? You'll need to re-enter them or rely on automatic detection.")) {
-      await clearCookies();
-    }
-  });
-
-  // Initial auth status check
+  // Display data statistics
   refreshAuthStatus();
 }
 
-async function importFromLinkedIn() {
-  const importBtn = document.getElementById("import-cookies-btn");
-  const importResult = document.getElementById("import-result");
-  const resultText = importResult.querySelector(".import-result-text");
-
-  // Disable button during import
-  importBtn.disabled = true;
-  importBtn.textContent = "Importing...";
-
+function refreshAuthStatus() {
+  // Update data statistics display
   try {
-    const result = await chrome.runtime.sendMessage({ action: "importFromTab" });
-
-    importResult.style.display = "block";
-    importResult.classList.remove("success", "error");
-
-    if (result.success) {
-      importResult.classList.add("success");
-      resultText.textContent = `✓ ${result.message}`;
-      showToast("Cookies imported successfully!", "success");
-
-      // Reload the saved cookies into form
-      await loadSavedCookies();
-      // Refresh auth status
-      await refreshAuthStatus();
-    } else {
-      importResult.classList.add("error");
-      resultText.textContent = `✗ ${result.error}`;
-      showToast("Import failed", "error");
-    }
+    const stats = LinkedInAPI.getDataStats();
+    document.getElementById("stat-locations").textContent = stats.locations.toLocaleString();
+    document.getElementById("stat-companies").textContent = stats.companies.toLocaleString();
+    document.getElementById("stat-titles").textContent = stats.titles.toLocaleString();
+    document.getElementById("stat-industries").textContent = stats.industries.toLocaleString();
   } catch (error) {
-    importResult.style.display = "block";
-    importResult.classList.add("error");
-    resultText.textContent = `✗ Error: ${error.message}`;
-    showToast("Import error", "error");
-  } finally {
-    importBtn.disabled = false;
-    importBtn.textContent = "🔗 Import Cookies from LinkedIn Tab";
-  }
-}
-
-async function loadSavedCookies() {
-  try {
-    const cookies = await chrome.runtime.sendMessage({ action: "getCookies" });
-    if (cookies) {
-      document.getElementById("cookie-li-at").value = cookies.li_at || "";
-      document.getElementById("cookie-jsessionid").value = cookies.JSESSIONID || "";
-    }
-  } catch (error) {
-    console.error("Error loading saved cookies:", error);
-  }
-}
-
-async function saveCookies() {
-  const liAt = document.getElementById("cookie-li-at").value.trim();
-  const jsessionId = document.getElementById("cookie-jsessionid").value.trim();
-
-  if (!liAt || !jsessionId) {
-    showToast("Please enter both cookies", "error");
-    return;
-  }
-
-  try {
-    const success = await chrome.runtime.sendMessage({
-      action: "saveCookies",
-      liAt: liAt,
-      jsessionId: jsessionId
-    });
-
-    if (success) {
-      showToast("Cookies saved successfully", "success");
-      refreshAuthStatus();
-    } else {
-      showToast("Failed to save cookies", "error");
-    }
-  } catch (error) {
-    console.error("Error saving cookies:", error);
-    showToast("Error saving cookies", "error");
-  }
-}
-
-async function clearCookies() {
-  try {
-    await chrome.runtime.sendMessage({ action: "clearCookies" });
-    document.getElementById("cookie-li-at").value = "";
-    document.getElementById("cookie-jsessionid").value = "";
-    showToast("Cookies cleared", "success");
-    refreshAuthStatus();
-    hideTestResult();
-  } catch (error) {
-    console.error("Error clearing cookies:", error);
-    showToast("Error clearing cookies", "error");
-  }
-}
-
-async function testConnection() {
-  const testResult = document.getElementById("test-result");
-  const testContent = testResult.querySelector(".test-result-content");
-
-  testResult.style.display = "block";
-  testResult.className = "test-result";
-  testContent.textContent = "Testing connection...";
-
-  try {
-    const result = await chrome.runtime.sendMessage({ action: "testConnection" });
-
-    if (result.success) {
-      testResult.classList.add("success");
-      testContent.textContent = result.message + ` (Source: ${result.source})`;
-      showToast("Connection test passed!", "success");
-    } else {
-      testResult.classList.add("error");
-      testContent.textContent = result.error + (result.source ? ` (Source: ${result.source})` : "");
-      showToast("Connection test failed", "error");
-    }
-  } catch (error) {
-    testResult.classList.add("error");
-    testContent.textContent = `Error: ${error.message}`;
-    showToast("Connection test error", "error");
-  }
-}
-
-function hideTestResult() {
-  document.getElementById("test-result").style.display = "none";
-}
-
-async function refreshAuthStatus() {
-  const authStatus = document.getElementById("auth-status");
-  const statusText = authStatus.querySelector(".status-text");
-
-  try {
-    const result = await chrome.runtime.sendMessage({ action: "checkAuth" });
-
-    // Remove existing status classes
-    authStatus.classList.remove("authenticated", "not-authenticated");
-
-    if (result.isAuthenticated) {
-      authStatus.classList.add("authenticated");
-      const sourceLabel = result.source === "manual" ? "manual cookies" : "auto-detected";
-      statusText.innerHTML = `<strong>Authenticated</strong> <span class="status-source">(${sourceLabel})</span>`;
-    } else {
-      authStatus.classList.add("not-authenticated");
-      statusText.innerHTML = `<strong>Not authenticated</strong> <span class="status-source">Enter cookies below or log into LinkedIn</span>`;
-    }
-  } catch (error) {
-    console.error("Error checking auth status:", error);
-    authStatus.classList.add("not-authenticated");
-    statusText.textContent = "Error checking status";
+    console.error("Error getting data stats:", error);
   }
 }

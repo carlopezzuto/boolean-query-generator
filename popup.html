@@ -263,72 +263,28 @@
     <!-- Settings Tab -->
     <div class="tab-content" id="settings-tab">
       <div class="settings-section">
-        <h3>LinkedIn Authentication</h3>
+        <h3>Data Status</h3>
         <div class="auth-status" id="auth-status">
-          <span class="status-indicator"></span>
-          <span class="status-text">Checking...</span>
+          <span class="status-indicator connected"></span>
+          <span class="status-text">Using offline data</span>
         </div>
 
         <div class="settings-info">
-          <p>The LinkedIn filters (Location, Company, School, Industry) require authentication to work.</p>
+          <p>All LinkedIn filters work offline using pre-loaded data. No authentication required!</p>
         </div>
 
-        <!-- Quick Import Section -->
-        <div class="import-section">
-          <h4>Quick Import (Recommended)</h4>
-          <p>Open LinkedIn in a tab, make sure you're logged in, then click the button below:</p>
-          <button type="button" class="btn btn-primary btn-import" id="import-cookies-btn">
-            🔗 Import Cookies from LinkedIn Tab
-          </button>
-          <div class="import-result" id="import-result" style="display: none;">
-            <span class="import-result-text"></span>
-          </div>
+        <div class="data-stats" id="data-stats">
+          <h4>Available Data</h4>
+          <ul class="stats-list">
+            <li><span class="stat-label">Locations:</span> <span id="stat-locations">Loading...</span></li>
+            <li><span class="stat-label">Companies:</span> <span id="stat-companies">Loading...</span></li>
+            <li><span class="stat-label">Job Titles:</span> <span id="stat-titles">Loading...</span></li>
+            <li><span class="stat-label">Industries:</span> <span id="stat-industries">Loading...</span></li>
+          </ul>
         </div>
 
-        <div class="settings-divider">
-          <span>or enter manually</span>
-        </div>
-
-        <div class="cookie-instructions collapsed" id="cookie-instructions">
-          <h4 class="instructions-toggle">
-            How to get your LinkedIn cookies manually
-            <span class="toggle-icon">▼</span>
-          </h4>
-          <ol class="instructions-list">
-            <li>Open <a href="https://www.linkedin.com" target="_blank">linkedin.com</a> and make sure you're logged in</li>
-            <li>Press <kbd>F12</kbd> to open Developer Tools</li>
-            <li>Go to <strong>Application</strong> tab (Chrome) or <strong>Storage</strong> tab (Firefox)</li>
-            <li>In the left sidebar, expand <strong>Cookies</strong> → <strong>https://www.linkedin.com</strong></li>
-            <li>Find and copy the values for <code>li_at</code> and <code>JSESSIONID</code></li>
-          </ol>
-        </div>
-
-        <form id="cookie-form" class="cookie-form">
-          <div class="form-group">
-            <label for="cookie-li-at">
-              li_at Cookie
-              <span class="hint">Main session cookie (required)</span>
-            </label>
-            <input type="text" id="cookie-li-at" placeholder="Paste your li_at cookie value here...">
-          </div>
-
-          <div class="form-group">
-            <label for="cookie-jsessionid">
-              JSESSIONID Cookie
-              <span class="hint">Used for CSRF token (required)</span>
-            </label>
-            <input type="text" id="cookie-jsessionid" placeholder="Paste your JSESSIONID cookie value here...">
-          </div>
-
-          <div class="form-actions">
-            <button type="submit" class="btn btn-primary">Save Cookies</button>
-            <button type="button" class="btn btn-secondary" id="test-cookies-btn">Test Connection</button>
-            <button type="button" class="btn btn-ghost" id="clear-cookies-btn">Clear Cookies</button>
-          </div>
-        </form>
-
-        <div class="test-result" id="test-result" style="display: none;">
-          <div class="test-result-content"></div>
+        <div class="settings-info" style="margin-top: 15px;">
+          <p><strong>Note:</strong> Data includes major countries, cities, and companies worldwide. If you can't find a specific location or company, try a broader search term.</p>
         </div>
       </div>
     </div>
@@ -352,6 +308,7 @@
   <!-- Toast Notification -->
   <div class="toast" id="toast"></div>
 
+  <script src="static-data.js"></script>
   <script src="linkedin-api.js"></script>
   <script src="query-generator.js"></script>
   <script src="storage.js"></script>

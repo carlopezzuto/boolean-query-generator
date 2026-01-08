@@ -1,18 +1,11 @@
 {
   "manifest_version": 3,
   "name": "Boolean Query Generator",
-  "version": "1.4.0",
+  "version": "2.0.0",
   "description": "Generate optimized boolean search queries for Google X-ray, GitHub, and LinkedIn with native facet filters.",
   "permissions": [
     "storage",
-    "clipboardWrite",
-    "tabs",
-    "cookies",
-    "activeTab"
-  ],
-  "host_permissions": [
-    "https://www.linkedin.com/*",
-    "https://*.linkedin.com/*"
+    "clipboardWrite"
   ],
   "background": {
     "service_worker": "background.js"
