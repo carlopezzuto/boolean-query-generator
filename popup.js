@@ -516,6 +516,7 @@ const selectedFacets = {
   geoUrn: [],
   currentCompany: [],
   pastCompany: [],
+  titleFilter: [],
   industry: [],
   schoolFilter: []
 };
@@ -561,6 +562,8 @@ function initTypeaheads() {
         results = LinkedInAPI.searchCompanies(query);
       } else if (type === "SCHOOL") {
         results = LinkedInAPI.searchSchools(query);
+      } else if (type === "TITLE") {
+        results = LinkedInAPI.searchTitles(query);
       } else if (type === "INDUSTRY") {
         results = LinkedInAPI.searchIndustries(query);
       }

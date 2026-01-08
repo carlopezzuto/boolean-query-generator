@@ -140,7 +140,7 @@
             <!-- Location Filter (geoUrn) -->
             <div class="form-group">
               <label>
-                Location
+                Location <span class="optional">(optional)</span>
                 <span class="hint">Geographic filters</span>
               </label>
               <div class="typeahead-container" data-type="GEO" data-param="geoUrn">
@@ -153,7 +153,7 @@
             <!-- Current Company Filter -->
             <div class="form-group">
               <label>
-                Current Company
+                Current Company <span class="optional">(optional)</span>
                 <span class="hint">Where they work now</span>
               </label>
               <div class="typeahead-container" data-type="COMPANY" data-param="currentCompany">
@@ -166,7 +166,7 @@
             <!-- Past Company Filter -->
             <div class="form-group">
               <label>
-                Past Company
+                Past Company <span class="optional">(optional)</span>
                 <span class="hint">Where they worked before</span>
               </label>
               <div class="typeahead-container" data-type="COMPANY" data-param="pastCompany">
@@ -176,10 +176,23 @@
               </div>
             </div>
 
+            <!-- Job Title Filter -->
+            <div class="form-group">
+              <label>
+                Job Title <span class="optional">(optional)</span>
+                <span class="hint">Current or past positions</span>
+              </label>
+              <div class="typeahead-container" data-type="TITLE" data-param="titleFilter">
+                <input type="text" class="typeahead-input" placeholder="Search job titles..." autocomplete="off">
+                <div class="typeahead-dropdown"></div>
+                <div class="selected-tags" id="selected-title"></div>
+              </div>
+            </div>
+
             <!-- Industry Filter -->
             <div class="form-group">
               <label>
-                Industry
+                Industry <span class="optional">(optional)</span>
                 <span class="hint">Business sector</span>
               </label>
               <div class="typeahead-container" data-type="INDUSTRY" data-param="industry">
@@ -192,7 +205,7 @@
             <!-- School Filter -->
             <div class="form-group">
               <label>
-                School
+                School <span class="optional">(optional)</span>
                 <span class="hint">Education</span>
               </label>
               <div class="typeahead-container" data-type="SCHOOL" data-param="schoolFilter">
