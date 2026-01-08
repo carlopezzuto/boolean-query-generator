@@ -1,110 +1,76 @@
 // ============================================
-// LinkedIn Voyager API Service
+// LinkedIn Static Data Service
 // ============================================
-// Provides typeahead search for locations, companies, schools, and industries
-// Uses background service worker for reliable API calls
-// Requires user to be logged into LinkedIn (uses session cookie)
+// Provides client-side search for locations, companies, titles, and industries
+// All data is pre-loaded from static JSON - no API calls needed
 
 const LinkedInAPI = {
-  // Search for locations (geoUrn) - uses background script
-  async searchLocations(query) {
+  // Search for locations (geoUrn) - client-side filtering
+  searchLocations(query) {
     if (!query || query.length < 2) return [];
-
-    try {
-      console.log("[LinkedIn API] Requesting locations via background:", query);
-      const results = await chrome.runtime.sendMessage({
-        action: "searchLocations",
-        query: query
-      });
-      console.log("[LinkedIn API] Received locations:", results?.length || 0);
-      return results || [];
-    } catch (error) {
-      console.error("[LinkedIn API] Error fetching locations:", error);
-      return [];
-    }
+    const lowerQuery = query.toLowerCase();
+    return LOCATIONS_LIST.filter(loc =>
+      loc.name.toLowerCase().includes(lowerQuery)
+    ).slice(0, 10);
   },
 
-  // Search for companies - uses background script
-  async searchCompanies(query) {
+  // Search for companies - client-side filtering
+  searchCompanies(query) {
     if (!query || query.length < 2) return [];
-
-    try {
-      console.log("[LinkedIn API] Requesting companies via background:", query);
-      const results = await chrome.runtime.sendMessage({
-        action: "searchCompanies",
-        query: query
-      });
-      console.log("[LinkedIn API] Received companies:", results?.length || 0);
-      return results || [];
-    } catch (error) {
-      console.error("[LinkedIn API] Error fetching companies:", error);
-      return [];
-    }
+    const lowerQuery = query.toLowerCase();
+    return COMPANIES_LIST.filter(company =>
+      company.name.toLowerCase().includes(lowerQuery)
+    ).slice(0, 10);
   },
 
-  // Search for schools - uses background script
-  async searchSchools(query) {
+  // Search for schools - uses companies list (schools are companies on LinkedIn)
+  searchSchools(query) {
     if (!query || query.length < 2) return [];
-
-    try {
-      console.log("[LinkedIn API] Requesting schools via background:", query);
-      const results = await chrome.runtime.sendMessage({
-        action: "searchSchools",
-        query: query
-      });
-      console.log("[LinkedIn API] Received schools:", results?.length || 0);
-      return results || [];
-    } catch (error) {
-      console.error("[LinkedIn API] Error fetching schools:", error);
-      return [];
-    }
+    const lowerQuery = query.toLowerCase();
+    // Filter for educational keywords
+    const eduKeywords = ['university', 'college', 'school', 'institute', 'academy', 'education'];
+    return COMPANIES_LIST.filter(company => {
+      const nameLower = company.name.toLowerCase();
+      return nameLower.includes(lowerQuery) &&
+             eduKeywords.some(kw => nameLower.includes(kw));
+    }).slice(0, 10);
   },
 
-  // Search for industries - uses background script with static fallback
-  async searchIndustries(query) {
+  // Search for industries - client-side filtering
+  searchIndustries(query) {
     if (!query || query.length < 2) return [];
-
-    try {
-      console.log("[LinkedIn API] Requesting industries via background:", query);
-      const results = await chrome.runtime.sendMessage({
-        action: "searchIndustries",
-        query: query
-      });
-      console.log("[LinkedIn API] Received industries:", results?.length || 0);
-
-      // If no results from API, use static fallback
-      if (!results || results.length === 0) {
-        return this.searchIndustriesStatic(query);
-      }
-
-      return results;
-    } catch (error) {
-      console.error("[LinkedIn API] Error fetching industries:", error);
-      return this.searchIndustriesStatic(query);
-    }
-  },
-
-  // Check if user is authenticated with LinkedIn
-  async isAuthenticated() {
-    try {
-      const result = await chrome.runtime.sendMessage({ action: "checkAuth" });
-      return result || false;
-    } catch (error) {
-      console.error("[LinkedIn API] Error checking auth:", error);
-      return false;
-    }
-  },
-
-  // Static industry list fallback
-  searchIndustriesStatic(query) {
     const lowerQuery = query.toLowerCase();
     return INDUSTRIES_LIST.filter(ind =>
       ind.name.toLowerCase().includes(lowerQuery)
     ).slice(0, 10);
+  },
+
+  // Search for job titles - client-side filtering
+  searchTitles(query) {
+    if (!query || query.length < 2) return [];
+    const lowerQuery = query.toLowerCase();
+    return TITLES_LIST.filter(title =>
+      title.name.toLowerCase().includes(lowerQuery)
+    ).slice(0, 10);
+  },
+
+  // Always "authenticated" since we use static data
+  isAuthenticated() {
+    return true;
+  },
+
+  // Get all data counts
+  getDataStats() {
+    return {
+      locations: LOCATIONS_LIST.length,
+      companies: COMPANIES_LIST.length,
+      titles: TITLES_LIST.length,
+      industries: INDUSTRIES_LIST.length
+    };
   }
 };
 
-// Static list of LinkedIn industries (fallback)
+// Static list of LinkedIn industries
 const INDUSTRIES_LIST = [
   { id: "1", name: "Defense & Space", type: "INDUSTRY" },
   { id: "3", name: "Computer Hardware", type: "INDUSTRY" },
