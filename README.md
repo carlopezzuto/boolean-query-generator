@@ -106,5 +106,5 @@ MIT
 
 ## Author
 
-Built with ❤️ for recruiters and sourcers by [Carlo](linkedin.com/in/carlopezzuto)
+Built with ❤️ for recruiters and sourcers by [Carlo](https://linkedin.com/in/carlopezzuto)
 
