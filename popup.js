@@ -9,6 +9,7 @@ document.addEventListener("DOMContentLoaded", () => {
   initPresets();
   initHistory();
   initModal();
+  initTypeaheads();
 });
 
 // ============================================
@@ -54,11 +55,13 @@ function updateFieldVisibility(platform) {
   const googleFields = document.querySelector(".google-only");
   const githubFields = document.querySelector(".github-only");
   const linkedinFields = document.querySelectorAll(".linkedin-only");
+  const nonLinkedinFields = document.querySelectorAll(".non-linkedin-only");
 
   // Hide all platform-specific fields first
   googleFields.style.display = "none";
   githubFields.style.display = "none";
   linkedinFields.forEach(el => el.style.display = "none");
+  nonLinkedinFields.forEach(el => el.style.display = "block");
 
   // Show fields for selected platform
   if (platform === "google") {
@@ -67,6 +70,8 @@ function updateFieldVisibility(platform) {
     githubFields.style.display = "block";
   } else if (platform === "linkedin") {
     linkedinFields.forEach(el => el.style.display = "block");
+    // Hide common locations field for LinkedIn (uses faceted filters instead)
+    nonLinkedinFields.forEach(el => el.style.display = "none");
   }
 }
 
@@ -91,6 +96,7 @@ function initForm() {
     form.reset();
     document.getElementById("results").style.display = "none";
     updateFieldVisibility("google");
+    clearSelectedFacets(); // Clear LinkedIn facet selections
   });
 }
 
@@ -113,9 +119,10 @@ function getFormData() {
     data.keywords = document.getElementById("keywords").value;
   } else if (platform === "linkedin") {
     data.titles = document.getElementById("linkedin-titles").value;
-    data.companies = document.getElementById("linkedin-companies").value;
     data.exclusions = document.getElementById("linkedin-exclusions").value;
     data.hackMode = document.getElementById("linkedin-hack-mode").checked;
+    // Get LinkedIn facets from typeahead selections
+    data.facets = getLinkedInFacets();
   }
 
   return data;
@@ -153,8 +160,19 @@ function handleGenerate() {
   const inputs = getFormData();
 
   // Validate minimum input
-  if (!inputs.skills.trim() && !inputs.locations.trim() && !inputs.keywords?.trim()) {
-    showToast("Please enter at least skills, locations, or keywords", "error");
+  const hasSkills = inputs.skills.trim();
+  const hasLocations = inputs.locations.trim();
+  const hasKeywords = inputs.keywords?.trim();
+  const hasFacets = platform === "linkedin" && inputs.facets && (
+    inputs.facets.geoUrn?.length > 0 ||
+    inputs.facets.currentCompany?.length > 0 ||
+    inputs.facets.pastCompany?.length > 0 ||
+    inputs.facets.industry?.length > 0 ||
+    inputs.facets.schoolFilter?.length > 0
+  );
+
+  if (!hasSkills && !hasLocations && !hasKeywords && !hasFacets) {
+    showToast("Please enter at least skills, locations, keywords, or select LinkedIn filters", "error");
     return;
   }
 
@@ -485,4 +503,216 @@ function parseList(input) {
     .split(/[,\n]/)
     .map(s => s.trim())
     .filter(s => s.length > 0);
+}
+
+// ============================================
+// Typeahead / Autocomplete for LinkedIn Filters
+// ============================================
+
+// Store selected items for each typeahead
+const selectedFacets = {
+  geoUrn: [],
+  currentCompany: [],
+  pastCompany: [],
+  industry: [],
+  schoolFilter: []
+};
+
+// Debounce function for API calls
+function debounce(func, wait) {
+  let timeout;
+  return function executedFunction(...args) {
+    const later = () => {
+      clearTimeout(timeout);
+      func(...args);
+    };
+    clearTimeout(timeout);
+    timeout = setTimeout(later, wait);
+  };
+}
+
+function initTypeaheads() {
+  const containers = document.querySelectorAll(".typeahead-container");
+
+  containers.forEach(container => {
+    const input = container.querySelector(".typeahead-input");
+    const dropdown = container.querySelector(".typeahead-dropdown");
+    const tagsContainer = container.querySelector(".selected-tags");
+    const type = container.dataset.type;
+    const param = container.dataset.param;
+
+    // Debounced search function
+    const debouncedSearch = debounce(async (query) => {
+      if (query.length < 2) {
+        dropdown.classList.remove("show");
+        return;
+      }
+
+      // Show loading state
+      dropdown.innerHTML = '<div class="typeahead-loading">Searching...</div>';
+      dropdown.classList.add("show");
+
+      try {
+        let results = [];
+
+        // Call appropriate API based on type
+        if (type === "GEO") {
+          results = await LinkedInAPI.searchLocations(query);
+        } else if (type === "COMPANY") {
+          results = await LinkedInAPI.searchCompanies(query);
+        } else if (type === "SCHOOL") {
+          results = await LinkedInAPI.searchSchools(query);
+        } else if (type === "INDUSTRY") {
+          results = await LinkedInAPI.searchIndustries(query);
+        }
+
+        if (results.length === 0) {
+          // If API returned nothing, try static fallback for industries
+          if (type === "INDUSTRY") {
+            results = LinkedInAPI.searchIndustriesStatic(query);
+          }
+
+          if (results.length === 0) {
+            dropdown.innerHTML = '<div class="typeahead-empty">No results found. Try a different search term.</div>';
+            return;
+          }
+        }
+
+        renderDropdownResults(dropdown, results, param, tagsContainer);
+      } catch (error) {
+        console.error("Typeahead error:", error);
+        dropdown.innerHTML = '<div class="typeahead-error">Error searching. Make sure you\'re logged into LinkedIn.</div>';
+      }
+    }, 300);
+
+    // Input event listener
+    input.addEventListener("input", (e) => {
+      debouncedSearch(e.target.value.trim());
+    });
+
+    // Focus shows dropdown if there's content
+    input.addEventListener("focus", () => {
+      if (dropdown.children.length > 0 && !dropdown.querySelector(".typeahead-loading")) {
+        dropdown.classList.add("show");
+      }
+    });
+
+    // Click outside closes dropdown
+    document.addEventListener("click", (e) => {
+      if (!container.contains(e.target)) {
+        dropdown.classList.remove("show");
+      }
+    });
+
+    // Render initial tags
+    renderSelectedTags(tagsContainer, param);
+  });
+}
+
+function renderDropdownResults(dropdown, results, param, tagsContainer) {
+  const selected = selectedFacets[param] || [];
+  const selectedIds = new Set(selected.map(s => s.id));
+
+  dropdown.innerHTML = results.map(item => `
+    <div class="typeahead-item ${selectedIds.has(item.id) ? 'selected' : ''}"
+         data-id="${escapeHtml(item.id)}"
+         data-name="${escapeHtml(item.name)}"
+         data-param="${param}">
+      <span class="typeahead-item-name">${escapeHtml(item.name)}</span>
+      <span class="typeahead-item-id">${escapeHtml(item.id)}</span>
+    </div>
+  `).join("");
+
+  // Add click handlers
+  dropdown.querySelectorAll(".typeahead-item").forEach(item => {
+    item.addEventListener("click", () => {
+      const id = item.dataset.id;
+      const name = item.dataset.name;
+      const itemParam = item.dataset.param;
+
+      // Toggle selection
+      if (item.classList.contains("selected")) {
+        // Remove from selection
+        selectedFacets[itemParam] = selectedFacets[itemParam].filter(s => s.id !== id);
+        item.classList.remove("selected");
+      } else {
+        // Add to selection
+        selectedFacets[itemParam].push({ id, name });
+        item.classList.add("selected");
+      }
+
+      renderSelectedTags(tagsContainer, itemParam);
+    });
+  });
+}
+
+function renderSelectedTags(container, param) {
+  const selected = selectedFacets[param] || [];
+
+  container.innerHTML = selected.map(item => `
+    <span class="selected-tag" data-id="${escapeHtml(item.id)}" data-param="${param}">
+      <span class="selected-tag-name" title="${escapeHtml(item.name)}">${escapeHtml(item.name)}</span>
+      <button class="selected-tag-remove" type="button">&times;</button>
+    </span>
+  `).join("");
+
+  // Add remove handlers
+  container.querySelectorAll(".selected-tag-remove").forEach(btn => {
+    btn.addEventListener("click", (e) => {
+      e.stopPropagation();
+      const tag = btn.closest(".selected-tag");
+      const id = tag.dataset.id;
+      const tagParam = tag.dataset.param;
+
+      selectedFacets[tagParam] = selectedFacets[tagParam].filter(s => s.id !== id);
+      renderSelectedTags(container, tagParam);
+
+      // Update dropdown if visible
+      const dropdown = container.closest(".typeahead-container").querySelector(".typeahead-dropdown");
+      const itemInDropdown = dropdown.querySelector(`[data-id="${id}"]`);
+      if (itemInDropdown) {
+        itemInDropdown.classList.remove("selected");
+      }
+    });
+  });
+}
+
+// Get LinkedIn facets for URL generation
+function getLinkedInFacets() {
+  return {
+    geoUrn: selectedFacets.geoUrn.map(s => s.id),
+    currentCompany: selectedFacets.currentCompany.map(s => s.id),
+    pastCompany: selectedFacets.pastCompany.map(s => s.id),
+    industry: selectedFacets.industry.map(s => s.id),
+    schoolFilter: selectedFacets.schoolFilter.map(s => s.id)
+  };
+}
+
+// Clear all selected facets
+function clearSelectedFacets() {
+  Object.keys(selectedFacets).forEach(key => {
+    selectedFacets[key] = [];
+  });
+
+  // Re-render all tag containers
+  document.querySelectorAll(".selected-tags").forEach(container => {
+    container.innerHTML = "";
+  });
+}
+
+// Format timestamp for history
+function formatTimestamp(isoString) {
+  const date = new Date(isoString);
+  const now = new Date();
+  const diffMs = now - date;
+  const diffMins = Math.floor(diffMs / 60000);
+  const diffHours = Math.floor(diffMs / 3600000);
+  const diffDays = Math.floor(diffMs / 86400000);
+
+  if (diffMins < 1) return "Just now";
+  if (diffMins < 60) return `${diffMins}m ago`;
+  if (diffHours < 24) return `${diffHours}h ago`;
+  if (diffDays < 7) return `${diffDays}d ago`;
+
+  return date.toLocaleDateString();
 }

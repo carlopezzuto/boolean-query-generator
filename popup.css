@@ -619,7 +619,201 @@ textarea {
 ::-webkit-scrollbar-thumb:hover {
   background: var(--gray-400);
 }
- /* ending */
+/* Typeahead / Autocomplete Styles */
+.facet-section {
+  margin: 16px 0;
+  padding: 12px;
+  background: var(--gray-50);
+  border-radius: var(--radius);
+  border: 1px solid var(--gray-200);
+}
+
+.facet-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 12px;
+  padding-bottom: 8px;
+  border-bottom: 1px solid var(--gray-200);
+}
+
+.facet-title {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--gray-700);
+}
+
+.typeahead-container {
+  position: relative;
+}
+
+.typeahead-input {
+  width: 100%;
+  padding: 8px 10px;
+  border: 1px solid var(--gray-300);
+  border-radius: var(--radius-sm);
+  font-size: 12px;
+  font-family: inherit;
+  transition: border-color 0.15s ease;
+}
+
+.typeahead-input:focus {
+  outline: none;
+  border-color: var(--primary);
+  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.1);
+}
+
+.typeahead-dropdown {
+  position: absolute;
+  top: 100%;
+  left: 0;
+  right: 0;
+  background: white;
+  border: 1px solid var(--gray-300);
+  border-top: none;
+  border-radius: 0 0 var(--radius-sm) var(--radius-sm);
+  max-height: 200px;
+  overflow-y: auto;
+  z-index: 50;
+  display: none;
+  box-shadow: var(--shadow-lg);
+}
+
+.typeahead-dropdown.show {
+  display: block;
+}
+
+.typeahead-item {
+  padding: 8px 10px;
+  font-size: 12px;
+  cursor: pointer;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  transition: background 0.1s ease;
+}
+
+.typeahead-item:hover {
+  background: var(--gray-100);
+}
+
+.typeahead-item.selected {
+  background: #eff6ff;
+}
+
+.typeahead-item-name {
+  color: var(--gray-800);
+  font-weight: 500;
+}
+
+.typeahead-item-id {
+  color: var(--gray-400);
+  font-size: 10px;
+  font-family: 'SF Mono', Monaco, monospace;
+}
+
+.typeahead-loading {
+  padding: 12px;
+  text-align: center;
+  color: var(--gray-500);
+  font-size: 11px;
+}
+
+.typeahead-empty {
+  padding: 12px;
+  text-align: center;
+  color: var(--gray-400);
+  font-size: 11px;
+}
+
+.typeahead-error {
+  padding: 10px;
+  text-align: center;
+  color: var(--danger);
+  font-size: 11px;
+  background: #fef2f2;
+}
+
+/* Selected Tags */
+.selected-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 8px;
+}
+
+.selected-tags:empty {
+  display: none;
+}
+
+.selected-tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 8px;
+  background: #eff6ff;
+  border: 1px solid #bfdbfe;
+  border-radius: 12px;
+  font-size: 11px;
+  color: var(--primary);
+}
+
+.selected-tag-name {
+  font-weight: 500;
+  max-width: 150px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.selected-tag-remove {
+  width: 14px;
+  height: 14px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  color: var(--primary);
+  font-size: 14px;
+  line-height: 1;
+  opacity: 0.7;
+  transition: opacity 0.1s ease;
+  padding: 0;
+}
+
+.selected-tag-remove:hover {
+  opacity: 1;
+}
+
+/* Auth warning for LinkedIn API */
+.auth-warning {
+  padding: 8px 10px;
+  background: #fef3c7;
+  border: 1px solid #fcd34d;
+  border-radius: var(--radius-sm);
+  font-size: 11px;
+  color: #92400e;
+  margin-bottom: 12px;
+  display: none;
+}
+
+.auth-warning.show {
+  display: block;
+}
+
+.auth-warning a {
+  color: #92400e;
+  font-weight: 500;
+}
+
+/* Non-LinkedIn only (hide for LinkedIn) */
+.non-linkedin-only {
+  display: block;
+}
+
+/* ending */
 .powered-by {
   padding: 4px 0;
   text-align: center;
