@@ -8,12 +8,18 @@ const LINKEDIN_BASE_URL = "https://www.linkedin.com/voyager/api";
 const MANUAL_COOKIES_KEY = "bqg_manual_cookies";
 
 // API endpoints - LinkedIn updates these periodically
+// Note: GraphQL queryIds change frequently, prefer REST endpoints
 const API_ENDPOINTS = {
-  // Try multiple endpoint patterns
+  // Typeahead endpoints in order of reliability
   typeahead: [
-    "/voyager/api/graphql?variables=(query:{query},type:{type})&queryId=voyagerSearchDashTypeahead.c2ee54263676c498cbb22dc22423918e",
-    "/voyager/api/search/dash/typeahead",
-    "/voyager/api/typeahead/hitsV2"
+    "/voyager/api/typeahead/hitsV2",
+    "/voyager/api/typeahead/hits",
+    "/voyager/api/search/cluster"
+  ],
+  // Auth verification endpoints
+  auth: [
+    "/voyager/api/me",
+    "/voyager/api/identity/profiles/me"
   ]
 };
 
@@ -270,6 +276,7 @@ function parseTypeaheadResults(data, type) {
 
   try {
     console.log(`[Background] Parsing ${type} response`);
+    console.log(`[Background] Response keys:`, Object.keys(data));
 
     // Handle different response structures
     const responseData = data.data || data;
@@ -278,9 +285,17 @@ function parseTypeaheadResults(data, type) {
 
     console.log(`[Background] Found ${elements.length} elements, ${included.length} included items`);
 
-    // Parse elements array
+    // Parse elements array - handle hitInfo structure from typeahead endpoint
     for (const element of elements) {
-      const item = parseElement(element, type);
+      let item = null;
+
+      // Check for hitInfo structure (newer typeahead response format)
+      if (element.hitInfo) {
+        item = parseHitInfoElement(element.hitInfo, type);
+      } else {
+        item = parseElement(element, type);
+      }
+
       if (item && !results.some(r => r.id === item.id)) {
         results.push(item);
       }
@@ -313,6 +328,85 @@ function parseTypeaheadResults(data, type) {
   }
 
   return results.slice(0, 10);
+}
+
+// Parse hitInfo structure from typeahead response
+function parseHitInfoElement(hitInfo, type) {
+  try {
+    // HitInfo contains type-specific data like:
+    // com.linkedin.voyager.typeahead.TypeaheadCompany
+    // com.linkedin.voyager.typeahead.TypeaheadGeo
+    // com.linkedin.voyager.typeahead.TypeaheadSchool
+    // com.linkedin.voyager.typeahead.TypeaheadIndustry
+
+    const typeKeys = {
+      "GEO": ["com.linkedin.voyager.typeahead.TypeaheadGeo", "com.linkedin.voyager.typeahead.TypeaheadLocation"],
+      "COMPANY": ["com.linkedin.voyager.typeahead.TypeaheadCompany"],
+      "SCHOOL": ["com.linkedin.voyager.typeahead.TypeaheadSchool"],
+      "INDUSTRY": ["com.linkedin.voyager.typeahead.TypeaheadIndustry"]
+    };
+
+    const keysToTry = typeKeys[type] || [];
+
+    for (const key of keysToTry) {
+      const data = hitInfo[key];
+      if (data) {
+        const id = data.id || "";
+        const name = data.displayName || data.name || data.text || "";
+
+        if (id && name) {
+          return {
+            id: String(id),
+            name: name,
+            type: type,
+            urn: `urn:li:${type.toLowerCase()}:${id}`
+          };
+        }
+      }
+    }
+
+    // Fallback: try to extract from any key in hitInfo
+    for (const [key, data] of Object.entries(hitInfo)) {
+      if (data && typeof data === 'object' && (data.id || data.entityUrn)) {
+        const id = data.id || extractIdFromUrn(data.entityUrn, type);
+        const name = data.displayName || data.name || data.text || "";
+
+        if (id && name) {
+          return {
+            id: String(id),
+            name: name,
+            type: type,
+            urn: `urn:li:${type.toLowerCase()}:${id}`
+          };
+        }
+      }
+    }
+
+    return null;
+  } catch (error) {
+    console.error("[Background] Error parsing hitInfo:", error);
+    return null;
+  }
+}
+
+// Extract ID from URN string
+function extractIdFromUrn(urn, type) {
+  if (!urn) return null;
+
+  const patterns = {
+    "GEO": /urn:li:(?:fsd_)?geo:(\d+)/,
+    "COMPANY": /urn:li:(?:fs_mini|fsd_)?[Cc]ompany:(\d+)/,
+    "SCHOOL": /urn:li:(?:fs_mini|fsd_)?[Ss]chool:(\d+)/,
+    "INDUSTRY": /urn:li:(?:fsd_)?industry:(\d+)/
+  };
+
+  const pattern = patterns[type];
+  if (pattern) {
+    const match = urn.match(pattern);
+    if (match) return match[1];
+  }
+
+  return null;
 }
 
 // Parse single element based on type
@@ -420,14 +514,16 @@ async function typeaheadSearch(query, type, extraParams = "") {
 
   const headers = await getHeaders();
 
-  // Try multiple endpoint patterns
+  // Try multiple endpoint patterns - ordered by reliability
   const endpoints = [
-    // New dash endpoint format
-    `https://www.linkedin.com/voyager/api/graphql?includeWebMetadata=true&variables=(query:${encodeURIComponent(query)},types:List(${type}),start:0,count:10)&queryId=voyagerSearchDashTypeahead.f44c445d06d59f04d9c30eb91afac4a1`,
-    // Alternative dash format
-    `https://www.linkedin.com/voyager/api/search/dash/typeahead?q=typeahead&query=${encodeURIComponent(query)}&types=List(${type})`,
-    // Legacy format
-    `${LINKEDIN_BASE_URL}/typeahead/hitsV2?keywords=${encodeURIComponent(query)}&origin=OTHER&q=type&type=${type}${extraParams}`
+    // Primary: typeahead hitsV2 endpoint (most reliable)
+    `${LINKEDIN_BASE_URL}/typeahead/hitsV2?keywords=${encodeURIComponent(query)}&origin=OTHER&q=type&type=${type}${extraParams}`,
+    // Alternative: blended typeahead
+    `${LINKEDIN_BASE_URL}/typeahead/hits?q=blended&query=${encodeURIComponent(query)}&type=${type}`,
+    // Fallback: search cluster endpoint
+    `${LINKEDIN_BASE_URL}/search/cluster?count=10&guides=List()&keywords=${encodeURIComponent(query)}&origin=OTHER&q=guided&type=${type}`,
+    // Guest endpoint (no auth required, limited results)
+    `https://www.linkedin.com/jobs-guest/api/typeaheadHits?query=${encodeURIComponent(query)}&typeaheadType=${type}&origin=OTHER`
   ];
 
   for (const url of endpoints) {
@@ -456,13 +552,20 @@ async function typeaheadSearch(query, type, extraParams = "") {
         // Log error response for debugging
         const errorText = await response.text().catch(() => 'Could not read response');
         console.error(`[Background] ${type} Error ${response.status}:`, errorText.substring(0, 200));
+
+        // Specific error handling
+        if (response.status === 401 || response.status === 403) {
+          console.error(`[Background] Authentication error - cookies may be expired or invalid`);
+        } else if (response.status === 429) {
+          console.error(`[Background] Rate limited - too many requests`);
+        }
       }
     } catch (error) {
       console.error(`[Background] Endpoint failed:`, error.message, error.stack);
     }
   }
 
-  console.error(`[Background] All ${type} endpoints failed`);
+  console.error(`[Background] All ${type} endpoints failed for query: ${query}`);
   return [];
 }
 
