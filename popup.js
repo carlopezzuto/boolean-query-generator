@@ -633,6 +633,13 @@ function renderDropdownResults(dropdown, results, param, tagsContainer) {
       }
 
       renderSelectedTags(tagsContainer, itemParam);
+
+      // Close dropdown and clear input after selection for better UX
+      dropdown.classList.remove("show");
+      const input = dropdown.closest(".typeahead-container").querySelector(".typeahead-input");
+      if (input) {
+        input.value = "";
+      }
     });
   });
 }
