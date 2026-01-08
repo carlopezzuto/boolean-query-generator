@@ -813,6 +813,252 @@ textarea {
   display: block;
 }
 
+/* Settings Tab */
+.settings-section {
+  padding: 12px 0;
+}
+
+.settings-section h3 {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--gray-800);
+  margin-bottom: 12px;
+}
+
+.settings-info {
+  font-size: 12px;
+  color: var(--gray-600);
+  margin-bottom: 16px;
+  line-height: 1.6;
+}
+
+.settings-info p {
+  margin-bottom: 8px;
+}
+
+/* Auth Status */
+.auth-status {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 12px;
+  background: var(--gray-100);
+  border-radius: var(--radius);
+  margin-bottom: 16px;
+}
+
+.status-indicator {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: var(--gray-400);
+}
+
+.auth-status.authenticated .status-indicator {
+  background: var(--success);
+}
+
+.auth-status.not-authenticated .status-indicator {
+  background: var(--danger);
+}
+
+.status-text {
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--gray-700);
+}
+
+.status-source {
+  font-size: 10px;
+  color: var(--gray-500);
+  margin-left: auto;
+}
+
+/* Import Section */
+.import-section {
+  background: #f0fdf4;
+  border: 1px solid #86efac;
+  border-radius: var(--radius);
+  padding: 12px;
+  margin-bottom: 16px;
+}
+
+.import-section h4 {
+  font-size: 12px;
+  font-weight: 600;
+  color: #166534;
+  margin-bottom: 8px;
+}
+
+.import-section p {
+  font-size: 11px;
+  color: var(--gray-600);
+  margin-bottom: 10px;
+}
+
+.btn-import {
+  width: 100%;
+  padding: 10px 16px;
+  font-size: 13px;
+}
+
+.import-result {
+  margin-top: 10px;
+  padding: 8px 10px;
+  border-radius: var(--radius-sm);
+  font-size: 11px;
+}
+
+.import-result.success {
+  background: #dcfce7;
+  color: #166534;
+}
+
+.import-result.error {
+  background: #fee2e2;
+  color: #991b1b;
+}
+
+/* Settings Divider */
+.settings-divider {
+  display: flex;
+  align-items: center;
+  margin: 16px 0;
+}
+
+.settings-divider::before,
+.settings-divider::after {
+  content: "";
+  flex: 1;
+  border-bottom: 1px solid var(--gray-300);
+}
+
+.settings-divider span {
+  padding: 0 10px;
+  font-size: 11px;
+  color: var(--gray-400);
+  text-transform: uppercase;
+}
+
+/* Cookie Instructions */
+.cookie-instructions {
+  background: #eff6ff;
+  border: 1px solid #bfdbfe;
+  border-radius: var(--radius);
+  padding: 12px;
+  margin-bottom: 16px;
+}
+
+.cookie-instructions.collapsed .instructions-list {
+  display: none;
+}
+
+.instructions-toggle {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--primary);
+  cursor: pointer;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 0;
+}
+
+.cookie-instructions:not(.collapsed) .instructions-toggle {
+  margin-bottom: 10px;
+}
+
+.toggle-icon {
+  font-size: 10px;
+  transition: transform 0.2s ease;
+}
+
+.cookie-instructions:not(.collapsed) .toggle-icon {
+  transform: rotate(180deg);
+}
+
+.instructions-list {
+  padding-left: 18px;
+  font-size: 11px;
+  color: var(--gray-700);
+  line-height: 1.8;
+  margin-top: 10px;
+}
+
+.instructions-list li {
+  margin-bottom: 4px;
+}
+
+.cookie-instructions a {
+  color: var(--primary);
+  text-decoration: underline;
+}
+
+.cookie-instructions kbd {
+  display: inline-block;
+  padding: 2px 6px;
+  font-size: 10px;
+  font-family: 'SF Mono', Monaco, monospace;
+  background: white;
+  border: 1px solid var(--gray-300);
+  border-radius: 3px;
+  box-shadow: 0 1px 0 var(--gray-300);
+}
+
+.cookie-instructions code {
+  font-family: 'SF Mono', Monaco, monospace;
+  font-size: 11px;
+  background: white;
+  padding: 1px 4px;
+  border-radius: 3px;
+  color: var(--primary);
+}
+
+/* Cookie Form */
+.cookie-form .form-group {
+  margin-bottom: 12px;
+}
+
+.cookie-form input[type="text"] {
+  font-family: 'SF Mono', Monaco, monospace;
+  font-size: 11px;
+}
+
+/* Test Result */
+.test-result {
+  margin-top: 16px;
+  padding: 12px;
+  border-radius: var(--radius);
+  font-size: 12px;
+}
+
+.test-result.success {
+  background: #d1fae5;
+  border: 1px solid #6ee7b7;
+  color: #065f46;
+}
+
+.test-result.error {
+  background: #fee2e2;
+  border: 1px solid #fca5a5;
+  color: #991b1b;
+}
+
+.test-result-content {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+}
+
+.test-result-content::before {
+  content: "✓";
+  font-weight: bold;
+}
+
+.test-result.error .test-result-content::before {
+  content: "✗";
+}
+
 /* ending */
 .powered-by {
   padding: 4px 0;

@@ -5,17 +5,105 @@
 // Service worker has better cross-origin request capabilities
 
 const LINKEDIN_BASE_URL = "https://www.linkedin.com/voyager/api";
+const MANUAL_COOKIES_KEY = "bqg_manual_cookies";
 
 // Cache for API results
 const cache = new Map();
 const CACHE_TIMEOUT = 5 * 60 * 1000; // 5 minutes
 
-// Get LinkedIn cookies
-async function getLinkedInCookies() {
+// Get manually stored cookies
+async function getManualCookies() {
   try {
-    const cookies = await chrome.cookies.getAll({ domain: ".linkedin.com" });
-    const cookieMap = {};
+    const result = await chrome.storage.local.get(MANUAL_COOKIES_KEY);
+    return result[MANUAL_COOKIES_KEY] || null;
+  } catch (error) {
+    console.error("[Background] Error getting manual cookies:", error);
+    return null;
+  }
+}
 
+// Save manual cookies
+async function saveManualCookies(liAt, jsessionId) {
+  try {
+    await chrome.storage.local.set({
+      [MANUAL_COOKIES_KEY]: {
+        li_at: liAt,
+        JSESSIONID: jsessionId
+      }
+    });
+    console.log("[Background] Manual cookies saved");
+    return true;
+  } catch (error) {
+    console.error("[Background] Error saving manual cookies:", error);
+    return false;
+  }
+}
+
+// Clear manual cookies
+async function clearManualCookies() {
+  try {
+    await chrome.storage.local.remove(MANUAL_COOKIES_KEY);
+    console.log("[Background] Manual cookies cleared");
+    return true;
+  } catch (error) {
+    console.error("[Background] Error clearing manual cookies:", error);
+    return false;
+  }
+}
+
+// Get LinkedIn cookies (manual first, then automatic)
+async function getLinkedInCookies() {
+  // First try manual cookies
+  const manualCookies = await getManualCookies();
+  if (manualCookies && manualCookies.li_at && manualCookies.JSESSIONID) {
+    console.log("[Background] Using manual cookies");
+    const csrfToken = manualCookies.JSESSIONID.replace(/"/g, '');
+    const cookieString = `li_at=${manualCookies.li_at}; JSESSIONID=${manualCookies.JSESSIONID}`;
+    return {
+      cookies: cookieString,
+      csrfToken: csrfToken,
+      isAuthenticated: true,
+      source: "manual"
+    };
+  }
+
+  // Fall back to automatic cookie capture
+  try {
+    console.log("[Background] Trying automatic cookie capture...");
+
+    // Try multiple methods to get cookies
+    let cookies = [];
+
+    // Method 1: Get by URL (more reliable in some cases)
+    try {
+      cookies = await chrome.cookies.getAll({ url: "https://www.linkedin.com" });
+      console.log("[Background] Method 1 (URL): Found", cookies.length, "cookies");
+    } catch (e) {
+      console.log("[Background] Method 1 failed:", e.message);
+    }
+
+    // Method 2: Get by domain if URL method failed
+    if (cookies.length === 0) {
+      try {
+        cookies = await chrome.cookies.getAll({ domain: ".linkedin.com" });
+        console.log("[Background] Method 2 (domain): Found", cookies.length, "cookies");
+      } catch (e) {
+        console.log("[Background] Method 2 failed:", e.message);
+      }
+    }
+
+    // Method 3: Try specific cookies by name
+    if (cookies.length === 0) {
+      console.log("[Background] Trying to get specific cookies...");
+      const liAtCookie = await chrome.cookies.get({ url: "https://www.linkedin.com", name: "li_at" });
+      const jsessionCookie = await chrome.cookies.get({ url: "https://www.linkedin.com", name: "JSESSIONID" });
+
+      if (liAtCookie) cookies.push(liAtCookie);
+      if (jsessionCookie) cookies.push(jsessionCookie);
+      console.log("[Background] Method 3 (specific): Found", cookies.length, "cookies");
+    }
+
+    const cookieMap = {};
     for (const cookie of cookies) {
       cookieMap[cookie.name] = cookie.value;
     }
@@ -29,14 +117,78 @@ async function getLinkedInCookies() {
     // Build cookie string
     const cookieString = cookies.map(c => `${c.name}=${c.value}`).join('; ');
 
+    const isAuthenticated = !!cookieMap.li_at;
+    console.log("[Background] Auto cookies - authenticated:", isAuthenticated, "has CSRF:", !!csrfToken);
+
     return {
       cookies: cookieString,
       csrfToken: csrfToken,
-      isAuthenticated: !!cookieMap.li_at
+      isAuthenticated: isAuthenticated,
+      source: "automatic"
     };
   } catch (error) {
     console.error("[Background] Error getting LinkedIn cookies:", error);
-    return { cookies: null, csrfToken: null, isAuthenticated: false };
+    return { cookies: null, csrfToken: null, isAuthenticated: false, source: "none" };
+  }
+}
+
+// Import cookies from LinkedIn tab (when user is on linkedin.com)
+async function importCookiesFromTab() {
+  try {
+    // Get the current active tab
+    const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+
+    if (!tab || !tab.url) {
+      return { success: false, error: "No active tab found" };
+    }
+
+    // Check if we're on LinkedIn
+    if (!tab.url.includes("linkedin.com")) {
+      return {
+        success: false,
+        error: "Please navigate to linkedin.com first, then try again",
+        currentUrl: tab.url
+      };
+    }
+
+    console.log("[Background] Importing cookies from LinkedIn tab:", tab.url);
+
+    // Get cookies for this specific tab's URL
+    const cookies = await chrome.cookies.getAll({ url: tab.url });
+    console.log("[Background] Found", cookies.length, "cookies from tab URL");
+
+    // Also try the main linkedin.com URL
+    const mainCookies = await chrome.cookies.getAll({ url: "https://www.linkedin.com" });
+    console.log("[Background] Found", mainCookies.length, "cookies from main URL");
+
+    // Merge cookies, preferring tab cookies
+    const cookieMap = {};
+    for (const cookie of [...mainCookies, ...cookies]) {
+      cookieMap[cookie.name] = cookie.value;
+    }
+
+    const liAt = cookieMap.li_at;
+    const jsessionId = cookieMap.JSESSIONID;
+
+    if (!liAt || !jsessionId) {
+      return {
+        success: false,
+        error: `Missing required cookies. Found: li_at=${!!liAt}, JSESSIONID=${!!jsessionId}. Make sure you're logged into LinkedIn.`,
+        cookieCount: Object.keys(cookieMap).length
+      };
+    }
+
+    // Save as manual cookies
+    await saveManualCookies(liAt, jsessionId);
+
+    return {
+      success: true,
+      message: "Cookies imported successfully!",
+      cookieCount: Object.keys(cookieMap).length
+    };
+  } catch (error) {
+    console.error("[Background] Error importing cookies:", error);
+    return { success: false, error: `Import failed: ${error.message}` };
   }
 }
 
@@ -376,8 +528,58 @@ async function searchIndustries(query) {
 
 // Check authentication
 async function checkAuth() {
-  const { isAuthenticated } = await getLinkedInCookies();
-  return isAuthenticated;
+  const { isAuthenticated, source } = await getLinkedInCookies();
+  return { isAuthenticated, source };
+}
+
+// Test connection by making a simple API call
+async function testConnection() {
+  try {
+    const { cookies, csrfToken, isAuthenticated, source } = await getLinkedInCookies();
+
+    if (!isAuthenticated) {
+      return {
+        success: false,
+        error: "Not authenticated - no valid cookies found",
+        source: source
+      };
+    }
+
+    // Try a simple typeahead query
+    const url = `${LINKEDIN_BASE_URL}/typeahead/hitsV2?keywords=test&origin=OTHER&q=type&type=GEO&queryContext=List(geoVersion->3)`;
+    const headers = await getHeaders();
+
+    const response = await fetch(url, {
+      method: "GET",
+      headers: headers,
+      credentials: "include"
+    });
+
+    if (response.ok) {
+      const data = await response.json();
+      const resultCount = data.elements?.length || data.included?.length || 0;
+      return {
+        success: true,
+        message: `Connection successful! Found ${resultCount} results.`,
+        source: source,
+        status: response.status
+      };
+    } else {
+      const errorText = await response.text();
+      return {
+        success: false,
+        error: `API returned ${response.status}: ${errorText.substring(0, 100)}`,
+        source: source,
+        status: response.status
+      };
+    }
+  } catch (error) {
+    return {
+      success: false,
+      error: `Connection error: ${error.message}`,
+      source: "none"
+    };
+  }
 }
 
 // Message handler
@@ -406,6 +608,31 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
 
   if (request.action === "checkAuth") {
     checkAuth().then(sendResponse);
+    return true;
+  }
+
+  if (request.action === "saveCookies") {
+    saveManualCookies(request.liAt, request.jsessionId).then(sendResponse);
+    return true;
+  }
+
+  if (request.action === "getCookies") {
+    getManualCookies().then(sendResponse);
+    return true;
+  }
+
+  if (request.action === "clearCookies") {
+    clearManualCookies().then(sendResponse);
+    return true;
+  }
+
+  if (request.action === "testConnection") {
+    testConnection().then(sendResponse);
+    return true;
+  }
+
+  if (request.action === "importFromTab") {
+    importCookiesFromTab().then(sendResponse);
     return true;
   }
 
