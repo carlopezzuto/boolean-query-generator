@@ -7,6 +7,16 @@
 const LINKEDIN_BASE_URL = "https://www.linkedin.com/voyager/api";
 const MANUAL_COOKIES_KEY = "bqg_manual_cookies";
 
+// API endpoints - LinkedIn updates these periodically
+const API_ENDPOINTS = {
+  // Try multiple endpoint patterns
+  typeahead: [
+    "/voyager/api/graphql?variables=(query:{query},type:{type})&queryId=voyagerSearchDashTypeahead.c2ee54263676c498cbb22dc22423918e",
+    "/voyager/api/search/dash/typeahead",
+    "/voyager/api/typeahead/hitsV2"
+  ]
+};
+
 // Cache for API results
 const cache = new Map();
 const CACHE_TIMEOUT = 5 * 60 * 1000; // 5 minutes
@@ -381,149 +391,73 @@ function parseIndustryResult(element) {
   }
 }
 
-// Search locations
-async function searchLocations(query) {
+// Generic typeahead search with fallback endpoints
+async function typeaheadSearch(query, type, extraParams = "") {
   if (!query || query.length < 2) return [];
 
-  const cached = getFromCache("GEO", query);
+  const cached = getFromCache(type, query);
   if (cached) return cached;
 
-  try {
-    const url = `${LINKEDIN_BASE_URL}/typeahead/hitsV2?keywords=${encodeURIComponent(query)}&origin=OTHER&q=type&type=GEO&queryContext=List(geoVersion->3,bingGeoSubTypeFilters->MARKET_AREA|COUNTRY_REGION|ADMIN_DIVISION_1|CITY)`;
+  const headers = await getHeaders();
 
-    console.log("[Background] Fetching locations:", url);
-    const headers = await getHeaders();
+  // Try multiple endpoint patterns
+  const endpoints = [
+    // New dash endpoint format
+    `https://www.linkedin.com/voyager/api/graphql?includeWebMetadata=true&variables=(query:${encodeURIComponent(query)},types:List(${type}),start:0,count:10)&queryId=voyagerSearchDashTypeahead.f44c445d06d59f04d9c30eb91afac4a1`,
+    // Alternative dash format
+    `https://www.linkedin.com/voyager/api/search/dash/typeahead?q=typeahead&query=${encodeURIComponent(query)}&types=List(${type})`,
+    // Legacy format
+    `${LINKEDIN_BASE_URL}/typeahead/hitsV2?keywords=${encodeURIComponent(query)}&origin=OTHER&q=type&type=${type}${extraParams}`
+  ];
 
-    const response = await fetch(url, {
-      method: "GET",
-      headers: headers,
-      credentials: "include"
-    });
+  for (const url of endpoints) {
+    try {
+      console.log(`[Background] Trying ${type} endpoint:`, url.substring(0, 80) + "...");
 
-    console.log("[Background] GEO Response:", response.status);
+      const response = await fetch(url, {
+        method: "GET",
+        headers: headers,
+        credentials: "include"
+      });
 
-    if (!response.ok) {
-      console.error("[Background] GEO error:", await response.text());
-      return [];
+      console.log(`[Background] ${type} Response:`, response.status);
+
+      if (response.ok) {
+        const data = await response.json();
+        const results = parseTypeaheadResults(data, type);
+
+        if (results.length > 0) {
+          setCache(type, query, results);
+          return results;
+        }
+      }
+    } catch (error) {
+      console.log(`[Background] Endpoint failed:`, error.message);
     }
-
-    const data = await response.json();
-    const results = parseTypeaheadResults(data, "GEO");
-    setCache("GEO", query, results);
-    return results;
-  } catch (error) {
-    console.error("[Background] Error fetching locations:", error);
-    return [];
   }
+
+  console.error(`[Background] All ${type} endpoints failed`);
+  return [];
+}
+
+// Search locations
+async function searchLocations(query) {
+  return typeaheadSearch(query, "GEO", "&queryContext=List(geoVersion->3,bingGeoSubTypeFilters->MARKET_AREA|COUNTRY_REGION|ADMIN_DIVISION_1|CITY)");
 }
 
 // Search companies
 async function searchCompanies(query) {
-  if (!query || query.length < 2) return [];
-
-  const cached = getFromCache("COMPANY", query);
-  if (cached) return cached;
-
-  try {
-    const url = `${LINKEDIN_BASE_URL}/typeahead/hitsV2?keywords=${encodeURIComponent(query)}&origin=OTHER&q=type&type=COMPANY`;
-
-    console.log("[Background] Fetching companies:", url);
-    const headers = await getHeaders();
-
-    const response = await fetch(url, {
-      method: "GET",
-      headers: headers,
-      credentials: "include"
-    });
-
-    console.log("[Background] COMPANY Response:", response.status);
-
-    if (!response.ok) {
-      console.error("[Background] COMPANY error:", await response.text());
-      return [];
-    }
-
-    const data = await response.json();
-    const results = parseTypeaheadResults(data, "COMPANY");
-    setCache("COMPANY", query, results);
-    return results;
-  } catch (error) {
-    console.error("[Background] Error fetching companies:", error);
-    return [];
-  }
+  return typeaheadSearch(query, "COMPANY");
 }
 
 // Search schools
 async function searchSchools(query) {
-  if (!query || query.length < 2) return [];
-
-  const cached = getFromCache("SCHOOL", query);
-  if (cached) return cached;
-
-  try {
-    const url = `${LINKEDIN_BASE_URL}/typeahead/hitsV2?keywords=${encodeURIComponent(query)}&origin=OTHER&q=type&type=SCHOOL`;
-
-    console.log("[Background] Fetching schools:", url);
-    const headers = await getHeaders();
-
-    const response = await fetch(url, {
-      method: "GET",
-      headers: headers,
-      credentials: "include"
-    });
-
-    console.log("[Background] SCHOOL Response:", response.status);
-
-    if (!response.ok) {
-      console.error("[Background] SCHOOL error:", await response.text());
-      return [];
-    }
-
-    const data = await response.json();
-    const results = parseTypeaheadResults(data, "SCHOOL");
-    setCache("SCHOOL", query, results);
-    return results;
-  } catch (error) {
-    console.error("[Background] Error fetching schools:", error);
-    return [];
-  }
+  return typeaheadSearch(query, "SCHOOL");
 }
 
 // Search industries
 async function searchIndustries(query) {
-  if (!query || query.length < 2) return [];
-
-  const cached = getFromCache("INDUSTRY", query);
-  if (cached) return cached;
-
-  try {
-    const url = `${LINKEDIN_BASE_URL}/typeahead/hitsV2?keywords=${encodeURIComponent(query)}&origin=OTHER&q=type&type=INDUSTRY`;
-
-    console.log("[Background] Fetching industries:", url);
-    const headers = await getHeaders();
-
-    const response = await fetch(url, {
-      method: "GET",
-      headers: headers,
-      credentials: "include"
-    });
-
-    console.log("[Background] INDUSTRY Response:", response.status);
-
-    if (!response.ok) {
-      console.error("[Background] INDUSTRY error:", await response.text());
-      // Return empty - fallback handled in popup
-      return [];
-    }
-
-    const data = await response.json();
-    const results = parseTypeaheadResults(data, "INDUSTRY");
-    setCache("INDUSTRY", query, results);
-    return results;
-  } catch (error) {
-    console.error("[Background] Error fetching industries:", error);
-    return [];
-  }
+  return typeaheadSearch(query, "INDUSTRY");
 }
 
 // Check authentication
@@ -545,32 +479,50 @@ async function testConnection() {
       };
     }
 
-    // Try a simple typeahead query
-    const url = `${LINKEDIN_BASE_URL}/typeahead/hitsV2?keywords=test&origin=OTHER&q=type&type=GEO&queryContext=List(geoVersion->3)`;
-    const headers = await getHeaders();
+    // Try a simple search using the typeahead function
+    const results = await searchLocations("New York");
 
-    const response = await fetch(url, {
-      method: "GET",
-      headers: headers,
-      credentials: "include"
-    });
-
-    if (response.ok) {
-      const data = await response.json();
-      const resultCount = data.elements?.length || data.included?.length || 0;
+    if (results && results.length > 0) {
       return {
         success: true,
-        message: `Connection successful! Found ${resultCount} results.`,
+        message: `Connection successful! Found ${results.length} results for "New York".`,
         source: source,
-        status: response.status
+        status: 200
       };
     } else {
-      const errorText = await response.text();
+      // Try alternative: just verify we can make an authenticated request
+      const headers = await getHeaders();
+      const testUrls = [
+        "https://www.linkedin.com/voyager/api/me",
+        "https://www.linkedin.com/voyager/api/identity/profiles/me"
+      ];
+
+      for (const url of testUrls) {
+        try {
+          const response = await fetch(url, {
+            method: "GET",
+            headers: headers,
+            credentials: "include"
+          });
+
+          if (response.ok) {
+            return {
+              success: true,
+              message: "Connection successful! Authentication verified.",
+              source: source,
+              status: response.status
+            };
+          }
+        } catch (e) {
+          continue;
+        }
+      }
+
       return {
         success: false,
-        error: `API returned ${response.status}: ${errorText.substring(0, 100)}`,
+        error: "API endpoints returned no results. LinkedIn may have changed their API.",
         source: source,
-        status: response.status
+        status: 404
       };
     }
   } catch (error) {
