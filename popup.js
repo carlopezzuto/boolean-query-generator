@@ -10,6 +10,7 @@ document.addEventListener("DOMContentLoaded", () => {
   initHistory();
   initModal();
   initTypeaheads();
+  initSettings();
 });
 
 // ============================================
@@ -33,6 +34,7 @@ function initTabs() {
       // Refresh content when switching tabs
       if (target === "presets") renderPresets();
       if (target === "history") renderHistory();
+      if (target === "settings") refreshAuthStatus();
     });
   });
 }
@@ -715,4 +717,148 @@ function formatTimestamp(isoString) {
   if (diffDays < 7) return `${diffDays}d ago`;
 
   return date.toLocaleDateString();
+}
+
+// ============================================
+// Settings / Cookie Management
+// ============================================
+
+function initSettings() {
+  const cookieForm = document.getElementById("cookie-form");
+  const testBtn = document.getElementById("test-cookies-btn");
+  const clearBtn = document.getElementById("clear-cookies-btn");
+
+  // Load existing cookies into form
+  loadSavedCookies();
+
+  // Save cookies form submit
+  cookieForm.addEventListener("submit", async (e) => {
+    e.preventDefault();
+    await saveCookies();
+  });
+
+  // Test connection button
+  testBtn.addEventListener("click", async () => {
+    await testConnection();
+  });
+
+  // Clear cookies button
+  clearBtn.addEventListener("click", async () => {
+    if (confirm("Clear saved cookies? You'll need to re-enter them or rely on automatic detection.")) {
+      await clearCookies();
+    }
+  });
+
+  // Initial auth status check
+  refreshAuthStatus();
+}
+
+async function loadSavedCookies() {
+  try {
+    const cookies = await chrome.runtime.sendMessage({ action: "getCookies" });
+    if (cookies) {
+      document.getElementById("cookie-li-at").value = cookies.li_at || "";
+      document.getElementById("cookie-jsessionid").value = cookies.JSESSIONID || "";
+    }
+  } catch (error) {
+    console.error("Error loading saved cookies:", error);
+  }
+}
+
+async function saveCookies() {
+  const liAt = document.getElementById("cookie-li-at").value.trim();
+  const jsessionId = document.getElementById("cookie-jsessionid").value.trim();
+
+  if (!liAt || !jsessionId) {
+    showToast("Please enter both cookies", "error");
+    return;
+  }
+
+  try {
+    const success = await chrome.runtime.sendMessage({
+      action: "saveCookies",
+      liAt: liAt,
+      jsessionId: jsessionId
+    });
+
+    if (success) {
+      showToast("Cookies saved successfully", "success");
+      refreshAuthStatus();
+    } else {
+      showToast("Failed to save cookies", "error");
+    }
+  } catch (error) {
+    console.error("Error saving cookies:", error);
+    showToast("Error saving cookies", "error");
+  }
+}
+
+async function clearCookies() {
+  try {
+    await chrome.runtime.sendMessage({ action: "clearCookies" });
+    document.getElementById("cookie-li-at").value = "";
+    document.getElementById("cookie-jsessionid").value = "";
+    showToast("Cookies cleared", "success");
+    refreshAuthStatus();
+    hideTestResult();
+  } catch (error) {
+    console.error("Error clearing cookies:", error);
+    showToast("Error clearing cookies", "error");
+  }
+}
+
+async function testConnection() {
+  const testResult = document.getElementById("test-result");
+  const testContent = testResult.querySelector(".test-result-content");
+
+  testResult.style.display = "block";
+  testResult.className = "test-result";
+  testContent.textContent = "Testing connection...";
+
+  try {
+    const result = await chrome.runtime.sendMessage({ action: "testConnection" });
+
+    if (result.success) {
+      testResult.classList.add("success");
+      testContent.textContent = result.message + ` (Source: ${result.source})`;
+      showToast("Connection test passed!", "success");
+    } else {
+      testResult.classList.add("error");
+      testContent.textContent = result.error + (result.source ? ` (Source: ${result.source})` : "");
+      showToast("Connection test failed", "error");
+    }
+  } catch (error) {
+    testResult.classList.add("error");
+    testContent.textContent = `Error: ${error.message}`;
+    showToast("Connection test error", "error");
+  }
+}
+
+function hideTestResult() {
+  document.getElementById("test-result").style.display = "none";
+}
+
+async function refreshAuthStatus() {
+  const authStatus = document.getElementById("auth-status");
+  const statusText = authStatus.querySelector(".status-text");
+
+  try {
+    const result = await chrome.runtime.sendMessage({ action: "checkAuth" });
+
+    // Remove existing status classes
+    authStatus.classList.remove("authenticated", "not-authenticated");
+
+    if (result.isAuthenticated) {
+      authStatus.classList.add("authenticated");
+      const sourceLabel = result.source === "manual" ? "manual cookies" : "auto-detected";
+      statusText.innerHTML = `<strong>Authenticated</strong> <span class="status-source">(${sourceLabel})</span>`;
+    } else {
+      authStatus.classList.add("not-authenticated");
+      statusText.innerHTML = `<strong>Not authenticated</strong> <span class="status-source">Enter cookies below or log into LinkedIn</span>`;
+    }
+  } catch (error) {
+    console.error("Error checking auth status:", error);
+    authStatus.classList.add("not-authenticated");
+    statusText.textContent = "Error checking status";
+  }
 }
