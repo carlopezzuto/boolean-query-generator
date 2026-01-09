@@ -14,10 +14,11 @@ A Chrome extension that generates optimized boolean search queries for Google X-
 - **One-click execution**: Open generated queries directly in new tabs
 - **Copy functions**: Copy individual queries or all at once
   
-<img width="400" height="562" alt="uibooleangenerator" src="https://github.com/user-attachments/assets/e72ee3b8-3d40-4a2f-adb6-4402474fb991" />
+<img width="300" height="422" alt="uibooleangenerator" src="https://github.com/user-attachments/assets/e72ee3b8-3d40-4a2f-adb6-4402474fb991" />
 
-<img width="400" height="562" alt="ui1booleangenerator" src="https://github.com/user-attachments/assets/fc80cafb-bb77-4013-befd-8bc06dabf23a" /> <img width="400" height="562" alt="ui2booleangenerator" src="https://github.com/user-attachments/assets/246b8ad5-c719-40ad-9fd8-1eaa2e9dfb55" />
-<img width="400" height="562" alt="ui3booleangenerator" src="https://github.com/user-attachments/assets/2cfac9a2-65e8-4272-bc4a-7b4178221c76" />
+<img width="300" height="422" alt="ui1booleangenerator" src="https://github.com/user-attachments/assets/fc80cafb-bb77-4013-befd-8bc06dabf23a" /> 
+<img width="300" height="422" alt="ui2booleangenerator" src="https://github.com/user-attachments/assets/246b8ad5-c719-40ad-9fd8-1eaa2e9dfb55" />
+<img width="300" height="422" alt="ui3booleangenerator" src="https://github.com/user-attachments/assets/2cfac9a2-65e8-4272-bc4a-7b4178221c76" />
 
 ## Installation
 
