@@ -13,6 +13,8 @@ A Chrome extension that generates optimized boolean search queries for Google X-
 - **History**: Track and re-run previous searches
 - **One-click execution**: Open generated queries directly in new tabs
 - **Copy functions**: Copy individual queries or all at once
+  
+<img width="743" height="1046" alt="uibooleangenerator" src="https://github.com/user-attachments/assets/e72ee3b8-3d40-4a2f-adb6-4402474fb991" />
 
 ## Installation
 
