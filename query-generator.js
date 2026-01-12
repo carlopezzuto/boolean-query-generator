@@ -70,6 +70,10 @@ function formatTerm(term) {
   return needsQuotes(term) ? `"${term}"` : term;
 }
 
+function formatIntitle(term) {
+  return needsQuotes(term) ? `intitle:"${term}"` : `intitle:${term}`;
+}
+
 // ============================================
 // Validators
 // ============================================
@@ -132,9 +136,9 @@ function generateGoogleQueries(inputs) {
     ? " " + exclusions.map(e => `-${e}`).join(" ") 
     : "";
   
-  // Build title group
-  const titleGroup = titles.length > 0 
-    ? ` (${titles.join(" OR ")})` 
+  // Build title group with intitle: operator for precise matching
+  const titleGroup = titles.length > 0
+    ? ` (${titles.map(formatIntitle).join(" OR ")})`
     : "";
   
   // Base site filter
@@ -220,7 +224,7 @@ function generateGitHubQueries(inputs) {
   
   const basePrefix = "type:user";
   const followerFilter = minFollowers > 0 ? ` followers:>${minFollowers}` : "";
-  const keywordStr = keywords.length > 0 ? " " + keywords.join(" ") : "";
+  const keywordStr = keywords.length > 0 ? " " + keywords.map(formatTerm).join(" ") : "";
   
   // GitHub requires splitting by language since you can only do implicit OR
   // with the same qualifier repeated
