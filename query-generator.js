@@ -224,7 +224,7 @@ function generateGitHubQueries(inputs) {
   
   const basePrefix = "type:user";
   const followerFilter = minFollowers > 0 ? ` followers:>${minFollowers}` : "";
-  const keywordStr = keywords.length > 0 ? " " + keywords.join(" ") : "";
+  const keywordStr = keywords.length > 0 ? " " + keywords.map(formatTerm).join(" ") : "";
   
   // GitHub requires splitting by language since you can only do implicit OR
   // with the same qualifier repeated
