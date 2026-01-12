@@ -70,6 +70,10 @@ function formatTerm(term) {
   return needsQuotes(term) ? `"${term}"` : term;
 }
 
+function formatIntitle(term) {
+  return needsQuotes(term) ? `intitle:"${term}"` : `intitle:${term}`;
+}
+
 // ============================================
 // Validators
 // ============================================
@@ -132,9 +136,9 @@ function generateGoogleQueries(inputs) {
     ? " " + exclusions.map(e => `-${e}`).join(" ") 
     : "";
   
-  // Build title group
-  const titleGroup = titles.length > 0 
-    ? ` (${titles.join(" OR ")})` 
+  // Build title group with intitle: operator for precise matching
+  const titleGroup = titles.length > 0
+    ? ` (${titles.map(formatIntitle).join(" OR ")})`
     : "";
   
   // Base site filter
