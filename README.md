@@ -43,7 +43,7 @@ A Chrome extension that generates optimized boolean search queries for Google X-
 
 ### From Chrome Web Store
 
-*(Coming soon)*
+[*Chrome Webstore*](https://chromewebstore.google.com/detail/boolean-query-generator/bhhjkpkonlnjmodabijpkllfbkjjlhpb?authuser=0&hl=en)
 
 ## Usage
 
