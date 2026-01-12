@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "Boolean Query Generator",
-  "version": "2.0.0",
+  "version": "2.0.1",
   "description": "Generate optimized boolean search queries for Google X-ray, GitHub, and LinkedIn with native facet filters.",
   "permissions": [
     "storage",
